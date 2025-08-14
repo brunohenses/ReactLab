@@ -1,0 +1,1 @@
+# View de exemplo (profile) protegida por login

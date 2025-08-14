@@ -1,0 +1,1 @@
+# Rotas HTML para a app simulator

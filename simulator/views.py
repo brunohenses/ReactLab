@@ -1,0 +1,1 @@
+# Views HTML (index, template_detail) para páginas públicas

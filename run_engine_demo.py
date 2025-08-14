@@ -1,0 +1,1 @@
+# Script simples para testar localmente o motor de simulação

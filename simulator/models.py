@@ -1,0 +1,1 @@
+# Models centrais: Species, ReactionTemplate, TemplateSpecies, SimulationRun, SimulationResult

@@ -1,0 +1,1 @@
+# Brief / notas de projeto (placeholder)

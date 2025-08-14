@@ -1,0 +1,1 @@
+# Registo dos models no admin Django
