@@ -23,7 +23,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'accounts',
-    'reactions'
+    'reactions',
+    'chemical_simulator'
 ]
 
 MIDDLEWARE = [
