@@ -12,15 +12,98 @@ class Species(models.Model):
     """
     Modelo para representar espécies químicas (reagentes/produtos)
     """
+    class PhysicalStateChoices(models.TextChoices):
+        SOLID = 'solid', 'Sólido'
+        LIQUID = 'liquid', 'Líquido'
+        GAS = 'gas', 'Gasoso'
+        AQUEOUS = 'aqueous', 'Aquoso'
+    
+    class RoleChoices(models.TextChoices):
+        REACTANT = 'reactant', 'Reagente'
+        PRODUCT = 'product', 'Produto'
+        CATALYST = 'catalyst', 'Catalisador'
+        SOLVENT = 'solvent', 'Solvente'
+        INTERMEDIATE = 'intermediate', 'Intermediário'
+    
+    class ColorChoices(models.TextChoices):
+        INCOLOR = 'incolor', 'Incolor'
+        WHITE = 'white', 'Branco'
+        YELLOW = 'yellow', 'Amarelo'
+        RED = 'red', 'Vermelho'
+        BLUE = 'blue', 'Azul'
+        GREEN = 'green', 'Verde'
+        BROWN = 'brown', 'Castanho'
+        BLACK = 'black', 'Preto'
+        PURPLE = 'purple', 'Roxo'
+        ORANGE = 'orange', 'Laranja'
+    
+    # Informações Básicas
     name = models.CharField(max_length=100, unique=True, verbose_name='Nome')
     formula = models.CharField(max_length=50, verbose_name='Fórmula Química')
     molecular_weight = models.FloatField(
         validators=[MinValueValidator(0.1)], 
         verbose_name='Peso Molecular (g/mol)'
     )
+    
+    # Propriedades Físicas
+    density = models.FloatField(
+        validators=[MinValueValidator(0.001)],
+        null=True, blank=True,
+        verbose_name='Densidade (g/cm³)',
+        help_text='Densidade a 25°C'
+    )
+    physical_state = models.CharField(
+        max_length=10,
+        choices=PhysicalStateChoices.choices,
+        default=PhysicalStateChoices.AQUEOUS,
+        verbose_name='Estado Físico (25°C)'
+    )
+    
+    # Propriedades para Simulação
+    default_concentration = models.FloatField(
+        validators=[MinValueValidator(0.0001), MaxValueValidator(100.0)],
+        verbose_name='Concentração Padrão Sugerida (mol·L⁻¹)',
+        help_text='Concentração típica para simulações'
+    )
+    simulation_role = models.CharField(
+        max_length=12,
+        choices=RoleChoices.choices,
+        default=RoleChoices.REACTANT,
+        verbose_name='Papel na Simulação'
+    )
+    
+    # Propriedades Visuais
+    color = models.CharField(
+        max_length=10,
+        choices=ColorChoices.choices,
+        default=ColorChoices.INCOLOR,
+        verbose_name='Cor'
+    )
+    transparency = models.CharField(
+        max_length=15,
+        choices=[
+            ('transparent', 'Transparente'),
+            ('translucent', 'Translúcido'), 
+            ('opaque', 'Opaco')
+        ],
+        default='transparent',
+        verbose_name='Transparência'
+    )
+    
+    # Informações Adicionais
     description = models.TextField(blank=True, verbose_name='Descrição')
+    
+    # Metadados
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # CAS (Registry Number)
+    cas_number = models.CharField(
+        max_length=15,
+        blank=True,
+        verbose_name='Número CAS',
+        help_text='Número de registro CAS (ex: 7732-18-5)'
+    )
 
     class Meta:
         verbose_name = 'Espécie Química'
@@ -28,7 +111,7 @@ class Species(models.Model):
         ordering = ['name']
 
     def __str__(self):
-        return f"{self.name} ({self.formula})"
+        return f"{self.name} ({self.formula}) - {self.get_simulation_role_display()}"
 
 
 class ReactionTemplate(models.Model):
@@ -36,9 +119,9 @@ class ReactionTemplate(models.Model):
     Modelo para templates de reações químicas
     """
     class OrderChoices(models.IntegerChoices):
-        ZERO = 0, 'Ordem 0'
-        FIRST = 1, 'Ordem 1' 
-        SECOND = 2, 'Ordem 2'
+        FIRST = 1, '1ª Ordem'
+        SECOND = 2, '2ª Ordem' 
+        THIRD = 3, '3ª Ordem'
 
     name = models.CharField(max_length=150, verbose_name='Nome da Reação')
     description = models.TextField(verbose_name='Descrição')
@@ -84,9 +167,10 @@ class ReactionTemplate(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.name} (Ordem {self.reaction_order})"
+        return f"{self.name} ({self.get_reaction_order_display()})"
 
 
+# SimulationRun mantém-se igual...
 class SimulationRun(models.Model):
     """
     Modelo para execuções/runs de simulação

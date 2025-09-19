@@ -1,0 +1,191 @@
+{% extends 'chemical_simulator/base.html' %}
+
+{% block title %}{{ template.name }} - Simulador Químico{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h2>{{ template.name }}</h2>
+        <p class="text-muted mb-0">
+            <i class="fas fa-user me-1"></i>Criado por {{ template.created_by.username }}
+            <span class="mx-2">•</span>
+            <i class="fas fa-calendar me-1"></i>{{ template.created_at|date:"d/m/Y H:i" }}
+        </p>
+    </div>
+    
+    <div class="btn-group">
+        <a href="{% url 'reaction_template_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Voltar
+        </a>
+        {% if user == template.created_by or user.is_staff %}
+        <a href="{% url 'reaction_template_update' template.pk %}" class="btn btn-warning">
+            <i class="fas fa-edit me-1"></i>Editar
+        </a>
+        <a href="{% url 'reaction_template_delete' template.pk %}" class="btn btn-danger">
+            <i class="fas fa-trash me-1"></i>Eliminar
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <!-- Informações Principais -->
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Informações da Reação
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Nome:</strong></div>
+                    <div class="col-sm-9">{{ template.name }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Descrição:</strong></div>
+                    <div class="col-sm-9">{{ template.description|linebreaks }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Ordem:</strong></div>
+                    <div class="col-sm-9">
+                        <span class="badge bg-info fs-6">{{ template.get_reaction_order_display }}</span>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Constante k:</strong></div>
+                    <div class="col-sm-9">
+                        <code class="bg-light p-2 rounded">{{ template.rate_constant }}</code>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-3"><strong>Estado:</strong></div>
+                    <div class="col-sm-9">
+                        {% if template.is_active %}
+                        <span class="badge bg-success">Ativo</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Inativo</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Espécies Químicas -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-flask me-2"></i>Espécies Químicas
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- Reagentes -->
+                    <div class="col-md-6">
+                        <h6 class="text-danger mb-3">
+                            <i class="fas fa-arrow-right me-1"></i>Reagentes
+                        </h6>
+                        {% if reactants %}
+                        <div class="list-group">
+                            {% for species in reactants %}
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">{{ species.name }}</h6>
+                                        <p class="mb-1 text-muted">{{ species.formula }}</p>
+                                        <small>Peso Molecular: {{ species.molecular_weight }} g/mol</small>
+                                    </div>
+                                    <span class="badge bg-danger">{{ species.get_simulation_role_display }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted">Nenhum reagente definido</p>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Produtos -->
+                    <div class="col-md-6">
+                        <h6 class="text-success mb-3">
+                            <i class="fas fa-arrow-left me-1"></i>Produtos
+                        </h6>
+                        {% if products %}
+                        <div class="list-group">
+                            {% for species in products %}
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">{{ species.name }}</h6>
+                                        <p class="mb-1 text-muted">{{ species.formula }}</p>
+                                        <small>Peso Molecular: {{ species.molecular_weight }} g/mol</small>
+                                    </div>
+                                    <span class="badge bg-success">{{ species.get_simulation_role_display }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted">Nenhum produto definido</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sidebar com ações -->
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-cogs me-2"></i>Ações
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if user.is_authenticated %}
+                <div class="d-grid gap-2">
+                    <a href="#" class="btn btn-primary">
+                        <i class="fas fa-play me-1"></i>Criar Simulação
+                    </a>
+                    <a href="#" class="btn btn-outline-info">
+                        <i class="fas fa-history me-1"></i>Ver Simulações Anteriores
+                    </a>
+                </div>
+                <hr>
+                {% endif %}
+                
+                <div class="d-grid gap-2">
+                    <a href="{% url 'reaction_template_list' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-list me-1"></i>Todos os Templates
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metadados -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-info me-2"></i>Metadados
+                </h6>
+            </div>
+            <div class="card-body">
+                <small class="text-muted">
+                    <div class="mb-2">
+                        <strong>Criado:</strong><br>
+                        {{ template.created_at|date:"d/m/Y H:i:s" }}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Atualizado:</strong><br>
+                        {{ template.updated_at|date:"d/m/Y H:i:s" }}
+                    </div>
+                    <div>
+                        <strong>ID:</strong> #{{ template.pk }}
+                    </div>
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

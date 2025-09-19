@@ -1,0 +1,190 @@
+{% extends 'chemical_simulator/base.html' %}
+
+{% block title %}{{ title }} - Simulador Químico{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>{{ title }}</h2>
+            <a href="{% if template %}{% url 'reaction_template_detail' template.pk %}{% else %}{% url 'reaction_template_list' %}{% endif %}" 
+               class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Voltar
+            </a>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {{ form.non_field_errors }}
+                    </div>
+                    {% endif %}
+
+                    <!-- Informações Básicas -->
+                    <div class="mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="fas fa-info-circle me-2"></i>Informações Básicas
+                        </h5>
+                        
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label class="form-label">{{ form.name.label }}</label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                <div class="text-danger small">{{ form.name.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="form-check mt-4">
+                                    {{ form.is_active }}
+                                    <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                        {{ form.is_active.label }}
+                                    </label>
+                                </div>
+                                {% if form.is_active.errors %}
+                                <div class="text-danger small">{{ form.is_active.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.description.label }}</label>
+                            {{ form.description }}
+                            {% if form.description.errors %}
+                            <div class="text-danger small">{{ form.description.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Parâmetros Cinéticos -->
+                    <div class="mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="fas fa-calculator me-2"></i>Parâmetros Cinéticos
+                        </h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">{{ form.reaction_order.label }}</label>
+                                {{ form.reaction_order }}
+                                {% if form.reaction_order.errors %}
+                                <div class="text-danger small">{{ form.reaction_order.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">{{ form.rate_constant.label }}</label>
+                                <div class="input-group">
+                                    {{ form.rate_constant }}
+                                    <span class="input-group-text">s⁻¹</span>
+                                </div>
+                                {% if form.rate_constant.errors %}
+                                <div class="text-danger small">{{ form.rate_constant.errors }}</div>
+                                {% endif %}
+                                {% if form.rate_constant.help_text %}
+                                <div class="form-text">{{ form.rate_constant.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Espécies Químicas -->
+                    <div class="mb-4">
+                        <h5 class="border-bottom pb-2 mb-3">
+                            <i class="fas fa-flask me-2"></i>Espécies Químicas
+                        </h5>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-danger">
+                                    <i class="fas fa-arrow-right me-1"></i>{{ form.reactants.label }}
+                                </label>
+                                {{ form.reactants }}
+                                {% if form.reactants.errors %}
+                                <div class="text-danger small">{{ form.reactants.errors }}</div>
+                                {% endif %}
+                                {% if form.reactants.help_text %}
+                                <div class="form-text">{{ form.reactants.help_text }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-success">
+                                    <i class="fas fa-arrow-left me-1"></i>{{ form.products.label }}
+                                </label>
+                                {{ form.products }}
+                                {% if form.products.errors %}
+                                <div class="text-danger small">{{ form.products.errors }}</div>
+                                {% endif %}
+                                {% if form.products.help_text %}
+                                <div class="form-text">{{ form.products.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Dica sobre seleção múltipla -->
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Dica:</strong> Use Ctrl+Click (Windows/Linux) ou Cmd+Click (Mac) para selecionar múltiplas espécies.
+                        </div>
+                    </div>
+
+                    <!-- Botões de ação -->
+                    <div class="d-flex justify-content-between">
+                        <a href="{% if template %}{% url 'reaction_template_detail' template.pk %}{% else %}{% url 'reaction_template_list' %}{% endif %}" 
+                           class="btn btn-secondary">
+                            <i class="fas fa-times me-1"></i>Cancelar
+                        </a>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>
+                            {% if template %}Atualizar Template{% else %}Criar Template{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Preview/Informações adicionais -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-lightbulb me-2"></i>Ajuda
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>1ª Ordem:</strong>
+                        <p class="small text-muted">Taxa ∝ [A]</p>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>2ª Ordem:</strong>
+                        <p class="small text-muted">Taxa ∝ [A]²</p>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>3ª Ordem:</strong>
+                        <p class="small text-muted">Taxa ∝ [A]³</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-resize textarea
+    const textarea = document.querySelector('textarea');
+    if (textarea) {
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = this.scrollHeight + 'px';
+        });
+    }
+});
+</script>
+{% endblock %}
