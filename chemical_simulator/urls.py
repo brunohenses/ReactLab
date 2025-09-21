@@ -22,6 +22,11 @@ urlpatterns = [
     path('species/import-csv/', views.species_csv_import, name='species_csv_import'),
     path('species/csv-template/', views.species_csv_template, name='species_csv_template'),    
     
+    # Template-Species Association URLs
+    path('templates/<int:pk>/manage-species/', views.template_species_manage, name='template_species_manage'),
+    path('templates/<int:pk>/equation-preview/', views.reaction_equation_preview, name='reaction_equation_preview'),
+    path('species/quick-add/', views.species_quick_add, name='species_quick_add'),
+    path('api/species-suggestions/', views.template_species_suggestions, name='template_species_suggestions'),
     
     # Placeholder URLs para Simulations (vamos criar depois)
     path('simulations/', views.simulation_list, name='simulation_list'),

@@ -5,9 +5,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from .models import ReactionTemplate, Species
-from .forms import ReactionTemplateForm, SpeciesForm, SpeciesCSVImportForm
+from .forms import ReactionTemplateForm, SpeciesForm, SpeciesCSVImportForm, TemplateSpeciesAssociationForm
 
 # Create your views here.
 
@@ -355,8 +355,143 @@ def species_csv_template(request):
     
     return response
 
+
 def simulation_list(request):
     """Placeholder view para simulations (será implementada depois)"""
     return render(request, 'chemical_simulator/placeholder.html', {
         'title': 'Simulações - Em desenvolvimento'
+    })
+
+
+# Adicionar ao chemical_simulator/views.py
+
+@login_required
+def template_species_manage(request, pk):
+    """Interface visual para gerir associações species-template"""
+    template = get_object_or_404(ReactionTemplate, pk=pk)
+    
+    # Verificar permissões
+    if template.created_by != request.user and not request.user.is_staff:
+        messages.error(request, 'Não tens permissão para editar este template.')
+        return redirect('reaction_template_detail', pk=pk)
+    
+    if request.method == 'POST':
+        form = TemplateSpeciesAssociationForm(template=template, data=request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Associações de espécies atualizadas com sucesso!')
+            return redirect('reaction_template_detail', pk=template.pk)
+    else:
+        form = TemplateSpeciesAssociationForm(template=template)
+    
+    # Organizar espécies por categoria para melhor visualização
+    species_by_role = {}
+    for role_key, role_label in Species.RoleChoices.choices:
+        species_by_role[role_key] = {
+            'label': role_label,
+            'species': Species.objects.filter(simulation_role=role_key).order_by('name')
+        }
+    
+    context = {
+        'template': template,
+        'form': form,
+        'species_by_role': species_by_role,
+        'title': f'Gerir Espécies: {template.name}'
+    }
+    return render(request, 'chemical_simulator/template_species_manage.html', context)
+
+
+def reaction_equation_preview(request, pk):
+    """API endpoint para preview da equação química"""
+    template = get_object_or_404(ReactionTemplate, pk=pk)
+    
+    # Construir equação química
+    reactants = list(template.reactants.all())
+    products = list(template.products.all())
+    
+    equation_data = {
+        'reactants': [{'name': r.name, 'formula': r.formula} for r in reactants],
+        'products': [{'name': p.name, 'formula': p.formula} for p in products],
+        'equation_text': ' + '.join([r.formula for r in reactants]) + ' → ' + ' + '.join([p.formula for p in products])
+    }
+    
+    return JsonResponse(equation_data)
+
+
+@login_required
+def species_quick_add(request):
+    """Modal para adicionar espécie rapidamente durante criação de template"""
+    if request.method == 'POST':
+        form = SpeciesForm(request.POST)
+        if form.is_valid():
+            species = form.save()
+            # Retornar dados da espécie para AJAX
+            return JsonResponse({
+                'success': True,
+                'species': {
+                    'id': species.pk,
+                    'name': species.name,
+                    'formula': species.formula,
+                    'role': species.simulation_role
+                }
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'errors': form.errors
+            })
+    
+    form = SpeciesForm()
+    return render(request, 'chemical_simulator/species_quick_add_modal.html', {
+        'form': form
+    })
+
+
+def template_species_suggestions(request):
+    """API para sugerir espécies baseado no tipo de reação"""
+    reaction_type = request.GET.get('type', '')
+    query = request.GET.get('q', '')
+    
+    suggestions = []
+    
+    # Filtrar espécies baseado no tipo de busca
+    species_qs = Species.objects.all()
+    
+    if query:
+        species_qs = species_qs.filter(
+            Q(name__icontains=query) | 
+            Q(formula__icontains=query)
+        )
+    
+    # Sugestões baseadas no tipo de reação
+    if reaction_type == 'neutralization':
+        # Sugerir ácidos e bases
+        acid_base_species = species_qs.filter(
+            Q(description__icontains='ácido') | 
+            Q(description__icontains='base') |
+            Q(name__icontains='ácido') |
+            Q(name__icontains='hidróxido')
+        )
+        suggestions.extend(acid_base_species)
+    
+    elif reaction_type == 'precipitation':
+        # Sugerir sais
+        salt_species = species_qs.filter(
+            Q(simulation_role='reactant') |
+            Q(name__icontains='cloreto') |
+            Q(name__icontains='sulfato')
+        )
+        suggestions.extend(salt_species)
+    
+    # Limitar a 10 sugestões
+    suggestions = suggestions[:10]
+    
+    return JsonResponse({
+        'suggestions': [{
+            'id': s.pk,
+            'name': s.name,
+            'formula': s.formula,
+            'role': s.get_simulation_role_display(),
+            'concentration': s.default_concentration
+        } for s in suggestions]
     })

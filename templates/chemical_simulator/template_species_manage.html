@@ -1,0 +1,357 @@
+{% extends 'chemical_simulator/base.html' %}
+
+{% block title %}{{ title }} - Simulador Químico{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2>{{ title }}</h2>
+                <p class="text-muted mb-0">
+                    <span class="badge bg-info">{{ template.get_reaction_order_display }}</span>
+                    <span class="mx-2">•</span>
+                    k = {{ template.rate_constant }}
+                </p>
+            </div>
+            <a href="{% url 'reaction_template_detail' template.pk %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Voltar
+            </a>
+        </div>
+
+        <!-- Preview da Equação Química -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-flask me-2"></i>Preview da Reação
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="equation-preview" class="text-center p-3 bg-light rounded">
+                    <div class="equation-display fs-4">
+                        <span id="reactants-preview" class="text-danger">
+                            {% for reactant in template.reactants.all %}
+                            {{ reactant.formula }}{% if not forloop.last %} + {% endif %}
+                            {% empty %}
+                            Selecione reagentes
+                            {% endfor %}
+                        </span>
+                        
+                        <span class="mx-3">→</span>
+                        
+                        <span id="products-preview" class="text-success">
+                            {% for product in template.products.all %}
+                            {{ product.formula }}{% if not forloop.last %} + {% endif %}
+                            {% empty %}
+                            Selecione produtos
+                            {% endfor %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" id="species-association-form">
+            {% csrf_token %}
+            
+            <!-- Interface de Gestão -->
+            <div class="row">
+                <!-- Espécies Disponíveis -->
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-atom me-2"></i>Espécies Disponíveis
+                                <button type="button" class="btn btn-sm btn-outline-primary float-end" 
+                                        data-bs-toggle="modal" data-bs-target="#quickAddModal">
+                                    <i class="fas fa-plus me-1"></i>Nova Espécie
+                                </button>
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Filtros -->
+                            <div class="mb-3">
+                                <input type="text" id="species-filter" class="form-control form-control-sm" 
+                                       placeholder="Filtrar espécies...">
+                            </div>
+                            
+                            <!-- Lista por Categoria -->
+                            {% for role_key, role_data in species_by_role.items %}
+                            <div class="species-category mb-3" data-role="{{ role_key }}">
+                                <h6 class="text-muted mb-2">
+                                    <i class="fas fa-tag me-1"></i>{{ role_data.label }}
+                                    <span class="badge bg-light text-dark">{{ role_data.species.count }}</span>
+                                </h6>
+                                
+                                <div class="species-list">
+                                    {% for species in role_data.species %}
+                                    <div class="species-item border rounded p-2 mb-2" 
+                                         data-species-id="{{ species.pk }}"
+                                         data-species-name="{{ species.name|lower }}"
+                                         data-species-formula="{{ species.formula|lower }}">
+                                        
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <strong>{{ species.name }}</strong>
+                                                <br>
+                                                <code class="small">{{ species.formula }}</code>
+                                                <br>
+                                                <small class="text-muted">
+                                                    {{ species.default_concentration }} M
+                                                    {% if species.cas_number %}
+                                                    • CAS: {{ species.cas_number }}
+                                                    {% endif %}
+                                                </small>
+                                            </div>
+                                            
+                                            <div class="btn-group-vertical btn-group-sm">
+                                                <button type="button" 
+                                                        class="btn btn-outline-danger add-reactant-btn"
+                                                        data-species-id="{{ species.pk }}">
+                                                    <i class="fas fa-arrow-right me-1"></i>Reagente
+                                                </button>
+                                                <button type="button" 
+                                                        class="btn btn-outline-success add-product-btn"
+                                                        data-species-id="{{ species.pk }}">
+                                                    <i class="fas fa-arrow-left me-1"></i>Produto
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% empty %}
+                                    <p class="text-muted small">Nenhuma espécie nesta categoria</p>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Espécies Selecionadas -->
+                <div class="col-lg-6">
+                    <div class="row">
+                        <!-- Reagentes -->
+                        <div class="col-12 mb-3">
+                            <div class="card border-danger">
+                                <div class="card-header bg-danger text-white">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-arrow-right me-2"></i>Reagentes
+                                        <span id="reactants-count" class="badge bg-white text-danger">
+                                            {{ template.reactants.count }}
+                                        </span>
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="selected-reactants" class="min-height-100">
+                                        {% for reactant in template.reactants.all %}
+                                        <div class="selected-species-item border rounded p-2 mb-2 bg-light" 
+                                             data-species-id="{{ reactant.pk }}">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>{{ reactant.name }}</strong>
+                                                    <code class="ms-2">{{ reactant.formula }}</code>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-outline-danger remove-species-btn">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                            <!-- Hidden input -->
+                                            <input type="hidden" name="reactant_{{ reactant.pk }}" value="true">
+                                        </div>
+                                        {% empty %}
+                                        <p class="text-muted text-center py-3">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Clique em "Reagente" nas espécies à esquerda
+                                        </p>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Produtos -->
+                        <div class="col-12">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="card-title mb-0">
+                                        <i class="fas fa-arrow-left me-2"></i>Produtos
+                                        <span id="products-count" class="badge bg-white text-success">
+                                            {{ template.products.count }}
+                                        </span>
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="selected-products" class="min-height-100">
+                                        {% for product in template.products.all %}
+                                        <div class="selected-species-item border rounded p-2 mb-2 bg-light" 
+                                             data-species-id="{{ product.pk }}">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>{{ product.name }}</strong>
+                                                    <code class="ms-2">{{ product.formula }}</code>
+                                                </div>
+                                                <button type="button" class="btn btn-sm btn-outline-danger remove-species-btn">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                            <!-- Hidden input -->
+                                            <input type="hidden" name="product_{{ product.pk }}" value="true">
+                                        </div>
+                                        {% empty %}
+                                        <p class="text-muted text-center py-3">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Clique em "Produto" nas espécies à esquerda
+                                        </p>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{% url 'reaction_template_detail' template.pk %}" class="btn btn-secondary">
+                    <i class="fas fa-times me-1"></i>Cancelar
+                </a>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-1"></i>Salvar Associações
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal para Adicionar Espécie Rapidamente -->
+<div class="modal fade" id="quickAddModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adicionar Nova Espécie</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Conteúdo carregado via AJAX -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Elementos principais
+    const reactantsContainer = document.getElementById('selected-reactants');
+    const productsContainer = document.getElementById('selected-products');
+    const reactantsPreview = document.getElementById('reactants-preview');
+    const productsPreview = document.getElementById('products-preview');
+    const reactantsCount = document.getElementById('reactants-count');
+    const productsCount = document.getElementById('products-count');
+    const speciesFilter = document.getElementById('species-filter');
+
+    // Filtro de espécies
+    speciesFilter.addEventListener('input', function() {
+        const filter = this.value.toLowerCase();
+        const speciesItems = document.querySelectorAll('.species-item');
+        
+        speciesItems.forEach(item => {
+            const name = item.dataset.speciesName;
+            const formula = item.dataset.speciesFormula;
+            const visible = name.includes(filter) || formula.includes(filter);
+            item.style.display = visible ? 'block' : 'none';
+        });
+    });
+
+    // Adicionar reagente
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.add-reactant-btn')) {
+            const speciesId = e.target.closest('.add-reactant-btn').dataset.speciesId;
+            addSpeciesTo('reactants', speciesId);
+        }
+    });
+
+    // Adicionar produto  
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.add-product-btn')) {
+            const speciesId = e.target.closest('.add-product-btn').dataset.speciesId;
+            addSpeciesTo('products', speciesId);
+        }
+    });
+
+    // Remover espécie
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.remove-species-btn')) {
+            e.target.closest('.selected-species-item').remove();
+            updatePreview();
+            updateCounts();
+        }
+    });
+
+    function addSpeciesTo(type, speciesId) {
+        const speciesItem = document.querySelector(`[data-species-id="${speciesId}"]`);
+        const speciesName = speciesItem.querySelector('strong').textContent;
+        const speciesFormula = speciesItem.querySelector('code').textContent;
+        
+        const container = type === 'reactants' ? reactantsContainer : productsContainer;
+        
+        // Verificar se já existe
+        if (container.querySelector(`[data-species-id="${speciesId}"]`)) {
+            return;
+        }
+
+        // Criar elemento
+        const newItem = document.createElement('div');
+        newItem.className = 'selected-species-item border rounded p-2 mb-2 bg-light';
+        newItem.dataset.speciesId = speciesId;
+        newItem.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>${speciesName}</strong>
+                    <code class="ms-2">${speciesFormula}</code>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-species-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <input type="hidden" name="${type === 'reactants' ? 'reactant' : 'product'}_${speciesId}" value="true">
+        `;
+
+        // Remover mensagem vazia se existir
+        const emptyMessage = container.querySelector('.text-muted.text-center');
+        if (emptyMessage) {
+            emptyMessage.remove();
+        }
+
+        container.appendChild(newItem);
+        updatePreview();
+        updateCounts();
+    }
+
+    function updatePreview() {
+        const reactantFormulas = Array.from(reactantsContainer.querySelectorAll('code'))
+            .map(code => code.textContent);
+        const productFormulas = Array.from(productsContainer.querySelectorAll('code'))
+            .map(code => code.textContent);
+
+        reactantsPreview.textContent = reactantFormulas.length > 0 ? 
+            reactantFormulas.join(' + ') : 'Selecione reagentes';
+        
+        productsPreview.textContent = productFormulas.length > 0 ? 
+            productFormulas.join(' + ') : 'Selecione produtos';
+    }
+
+    function updateCounts() {
+        const reactantCount = reactantsContainer.querySelectorAll('.selected-species-item').length;
+        const productCount = productsContainer.querySelectorAll('.selected-species-item').length;
+        
+        reactantsCount.textContent = reactantCount;
+        productsCount.textContent = productCount;
+    }
+});
+</script>
+{% endblock %}

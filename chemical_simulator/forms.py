@@ -1,4 +1,5 @@
 from django import forms
+from django.forms.widgets import CheckboxSelectMultiple
 from .models import ReactionTemplate, Species
 
 class ReactionTemplateForm(forms.ModelForm):
@@ -25,13 +26,13 @@ class ReactionTemplateForm(forms.ModelForm):
                 'min': '0.0001',
                 'placeholder': '0.01'
             }),
-            'reactants': forms.SelectMultiple(attrs={
-                'class': 'form-select',
-                'size': '5'
+            
+            # Usar checkboxes para seleção múltipla de espécies
+            'reactants': CheckboxSelectMultiple(attrs={
+                'class': 'species-checkbox-list'
             }),
-            'products': forms.SelectMultiple(attrs={
-                'class': 'form-select', 
-                'size': '5'
+            'products': CheckboxSelectMultiple(attrs={
+                'class': 'species-checkbox-list'
             }),
             'is_active': forms.CheckboxInput(attrs={
                 'class': 'form-check-input'
@@ -56,14 +57,32 @@ class ReactionTemplateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
-        # Filtrar apenas espécies que podem ser reagentes/produtos
-        self.fields['reactants'].queryset = Species.objects.filter(
-            simulation_role__in=['reactant', 'product', 'intermediate']
+        
+        # Organizar espécies por papel na simulação
+        reactant_species = Species.objects.filter(
+            simulation_role__in=['reactant', 'intermediate']
         ).order_by('name')
         
-        self.fields['products'].queryset = Species.objects.filter(
-            simulation_role__in=['product', 'reactant', 'intermediate']  
+        product_species = Species.objects.filter(
+            simulation_role__in=['product', 'intermediate']
         ).order_by('name')
+        
+        # Adicionar todas as espécies como opção (caso user queira escolher diferente do role)
+        all_species = Species.objects.all().order_by('name')
+        
+        self.fields['reactants'].queryset = all_species
+        self.fields['products'].queryset = all_species
+        
+        # Adicionar classes CSS para styling
+        self.fields['reactants'].widget.attrs.update({
+            'data-role': 'reactants',
+            'data-default-filter': 'reactant,intermediate'
+        })
+        
+        self.fields['products'].widget.attrs.update({
+            'data-role': 'products', 
+            'data-default-filter': 'product,intermediate'
+        })
 
     def clean(self):
         cleaned_data = super().clean()
@@ -71,10 +90,10 @@ class ReactionTemplateForm(forms.ModelForm):
         products = cleaned_data.get('products')
         
         # Validar que há pelo menos 1 reagente e 1 produto
-        if reactants and len(reactants) < 1:
+        if not reactants or len(reactants) < 1:
             raise forms.ValidationError("Selecione pelo menos 1 reagente.")
             
-        if products and len(products) < 1:
+        if not products or len(products) < 1:
             raise forms.ValidationError("Selecione pelo menos 1 produto.")
             
         # Verificar que reagentes e produtos não se sobrepõem
@@ -87,6 +106,55 @@ class ReactionTemplateForm(forms.ModelForm):
                 )
         
         return cleaned_data
+
+
+# Nova form para gestão rápida de associações
+class TemplateSpeciesAssociationForm(forms.Form):
+    """Formulário para gerir associações species-template de forma visual"""
+    
+    def __init__(self, template=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.template = template
+        
+        if template:
+            # Criar campos dinâmicos para cada espécie
+            all_species = Species.objects.all().order_by('simulation_role', 'name')
+            
+            for species in all_species:
+                # Campo para definir se é reagente
+                self.fields[f'reactant_{species.pk}'] = forms.BooleanField(
+                    required=False,
+                    initial=species in template.reactants.all(),
+                    label=f'{species.name} como reagente'
+                )
+                
+                # Campo para definir se é produto
+                self.fields[f'product_{species.pk}'] = forms.BooleanField(
+                    required=False,
+                    initial=species in template.products.all(),
+                    label=f'{species.name} como produto'
+                )
+    
+    def save(self):
+        """Salvar as associações"""
+        if not self.template:
+            return
+        
+        # Limpar associações existentes
+        self.template.reactants.clear()
+        self.template.products.clear()
+        
+        # Aplicar novas associações
+        for field_name, value in self.cleaned_data.items():
+            if value and field_name.startswith('reactant_'):
+                species_pk = field_name.replace('reactant_', '')
+                species = Species.objects.get(pk=species_pk)
+                self.template.reactants.add(species)
+            
+            elif value and field_name.startswith('product_'):
+                species_pk = field_name.replace('product_', '')
+                species = Species.objects.get(pk=species_pk)
+                self.template.products.add(species)
     
 class SpeciesForm(forms.ModelForm):
     class Meta:
