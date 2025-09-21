@@ -1,0 +1,221 @@
+{% extends 'chemical_simulator/base.html' %}
+
+{% block title %}Espécies Químicas - Simulador Químico{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-atom me-2"></i>Espécies Químicas</h2>
+    
+    <div class="btn-group">
+        {% if user.is_authenticated %}
+        <a href="{% url 'species_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>Nova Espécie
+        </a>
+        <a href="{% url 'species_csv_import' %}" class="btn btn-success">
+            <i class="fas fa-file-import me-1"></i>Importar CSV
+        </a>
+        {% endif %}
+        <a href="{% url 'species_csv_template' %}" class="btn btn-outline-info">
+            <i class="fas fa-download me-1"></i>Template CSV
+        </a>
+    </div>
+</div>
+
+<!-- Filtros e Busca -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Buscar:</label>
+                <input type="text" name="search" class="form-control" value="{{ search|default:'' }}" 
+                       placeholder="Nome, fórmula ou CAS...">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Papel na Simulação:</label>
+                <select name="role" class="form-select">
+                    <option value="">Todos</option>
+                    {% for value, label in role_choices %}
+                    <option value="{{ value }}" {% if role == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Estado Físico:</label>
+                <select name="physical_state" class="form-select">
+                    <option value="">Todos</option>
+                    {% for value, label in state_choices %}
+                    <option value="{{ value }}" {% if physical_state == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-search"></i>
+                </button>
+                <a href="{% url 'species_list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista de Espécies -->
+{% if species %}
+<div class="row">
+    {% for sp in species %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h5 class="card-title mb-0">
+                        <a href="{% url 'species_detail' sp.pk %}" class="text-decoration-none">
+                            {{ sp.name }}
+                        </a>
+                    </h5>
+                    <div class="ms-2">
+                        {% if sp.color != 'incolor' %}
+                        <span class="badge bg-primary">
+                            {{ sp.get_color_display }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="mb-2">
+                    <code class="bg-light p-1 rounded">{{ sp.formula }}</code>
+                    <small class="text-muted ms-2">{{ sp.molecular_weight }} g/mol</small>
+                </div>
+                
+                <div class="mb-3">
+                    <span class="badge bg-info">{{ sp.get_simulation_role_display }}</span>
+                    <span class="badge bg-secondary">{{ sp.get_physical_state_display }}</span>
+                    {% if sp.default_concentration %}
+                    <span class="badge bg-success">{{ sp.default_concentration }} M</span>
+                    {% endif %}
+                </div>
+                
+                {% if sp.description %}
+                <p class="card-text text-muted small">{{ sp.description|truncatewords:12 }}</p>
+                {% endif %}
+                
+                {% if sp.cas_number %}
+                <div class="small text-muted">
+                    <i class="fas fa-tag me-1"></i>CAS: {{ sp.cas_number }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="card-footer bg-transparent">
+                <div class="btn-group w-100" role="group">
+                    <a href="{% url 'species_detail' sp.pk %}" 
+                       class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-eye"></i> Ver
+                    </a>
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'species_update' sp.pk %}" 
+                       class="btn btn-outline-warning btn-sm">
+                        <i class="fas fa-edit"></i> Editar
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Paginação -->
+{% if species.has_other_pages %}
+<nav aria-label="Paginação">
+    <ul class="pagination justify-content-center">
+        {% if species.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ species.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if role %}&role={{ role }}{% endif %}{% if physical_state %}&physical_state={{ physical_state }}{% endif %}">
+                Anterior
+            </a>
+        </li>
+        {% endif %}
+        
+        {% for num in species.paginator.page_range %}
+        {% if species.number == num %}
+        <li class="page-item active">
+            <span class="page-link">{{ num }}</span>
+        </li>
+        {% else %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ num }}{% if search %}&search={{ search }}{% endif %}{% if role %}&role={{ role }}{% endif %}{% if physical_state %}&physical_state={{ physical_state }}{% endif %}">
+                {{ num }}
+            </a>
+        </li>
+        {% endif %}
+        {% endfor %}
+        
+        {% if species.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ species.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if role %}&role={{ role }}{% endif %}{% if physical_state %}&physical_state={{ physical_state }}{% endif %}">
+                Próxima
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="text-center py-5">
+    <i class="fas fa-atom fa-3x text-muted mb-3"></i>
+    <h4 class="text-muted">Nenhuma espécie encontrada</h4>
+    <p class="text-muted">
+        {% if search or role or physical_state %}
+        Tente ajustar os filtros de busca.
+        {% else %}
+        Ainda não há espécies químicas criadas.
+        {% endif %}
+    </p>
+    {% if user.is_authenticated %}
+    <div class="mt-4">
+        <a href="{% url 'species_create' %}" class="btn btn-primary me-2">
+            <i class="fas fa-plus me-1"></i>Criar Primeira Espécie
+        </a>
+        <a href="{% url 'species_csv_import' %}" class="btn btn-success">
+            <i class="fas fa-file-import me-1"></i>Importar via CSV
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Estatísticas rápidas -->
+{% if species %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <div class="row text-center">
+                <div class="col-md-3">
+                    <strong>{{ species.paginator.count }}</strong><br>
+                    <small>Total de espécies</small>
+                </div>
+                <div class="col-md-3">
+                    <strong>{{ species|length }}</strong><br>
+                    <small>Nesta página</small>
+                </div>
+                <div class="col-md-3">
+                    <strong>{{ species.paginator.num_pages }}</strong><br>
+                    <small>Páginas total</small>
+                </div>
+                <div class="col-md-3">
+                    <a href="{% url 'species_csv_template' %}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-download me-1"></i>Baixar Template
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

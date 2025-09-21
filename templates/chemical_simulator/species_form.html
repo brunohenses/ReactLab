@@ -1,0 +1,277 @@
+{% extends 'chemical_simulator/base.html' %}
+
+{% block title %}{{ title }} - Simulador Químico{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>{{ title }}</h2>
+            <a href="{% if species %}{% url 'species_detail' species.pk %}{% else %}{% url 'species_list' %}{% endif %}" 
+               class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Voltar
+            </a>
+        </div>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <div class="row">
+                <!-- Coluna Esquerda -->
+                <div class="col-md-6">
+                    <!-- Informações Básicas -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-info-circle me-2"></i>Informações Básicas
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.name.label }}</label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                <div class="text-danger small">{{ form.name.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ form.formula.label }}</label>
+                                    {{ form.formula }}
+                                    {% if form.formula.errors %}
+                                    <div class="text-danger small">{{ form.formula.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ form.molecular_weight.label }}</label>
+                                    <div class="input-group">
+                                        {{ form.molecular_weight }}
+                                        <span class="input-group-text">g/mol</span>
+                                    </div>
+                                    {% if form.molecular_weight.errors %}
+                                    <div class="text-danger small">{{ form.molecular_weight.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.description.label }}</label>
+                                {{ form.description }}
+                                {% if form.description.errors %}
+                                <div class="text-danger small">{{ form.description.errors }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Propriedades Físicas -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-thermometer-half me-2"></i>Propriedades Físicas (25°C)
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ form.physical_state.label }}</label>
+                                    {{ form.physical_state }}
+                                    {% if form.physical_state.errors %}
+                                    <div class="text-danger small">{{ form.physical_state.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ form.density.label }}</label>
+                                    <div class="input-group">
+                                        {{ form.density }}
+                                        <span class="input-group-text">g/cm³</span>
+                                    </div>
+                                    {% if form.density.errors %}
+                                    <div class="text-danger small">{{ form.density.errors }}</div>
+                                    {% endif %}
+                                    {% if form.density.help_text %}
+                                    <div class="form-text">{{ form.density.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Identificação -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-tag me-2"></i>Identificação
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.cas_number.label }}</label>
+                                {{ form.cas_number }}
+                                {% if form.cas_number.errors %}
+                                <div class="text-danger small">{{ form.cas_number.errors }}</div>
+                                {% endif %}
+                                {% if form.cas_number.help_text %}
+                                <div class="form-text">{{ form.cas_number.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coluna Direita -->
+                <div class="col-md-6">
+                    <!-- Propriedades para Simulação -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-flask me-2"></i>Propriedades para Simulação
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.simulation_role.label }}</label>
+                                {{ form.simulation_role }}
+                                {% if form.simulation_role.errors %}
+                                <div class="text-danger small">{{ form.simulation_role.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.default_concentration.label }}</label>
+                                <div class="input-group">
+                                    {{ form.default_concentration }}
+                                    <span class="input-group-text">mol·L⁻¹</span>
+                                </div>
+                                {% if form.default_concentration.errors %}
+                                <div class="text-danger small">{{ form.default_concentration.errors }}</div>
+                                {% endif %}
+                                {% if form.default_concentration.help_text %}
+                                <div class="form-text">{{ form.default_concentration.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Propriedades Visuais -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-eye me-2"></i>Propriedades Visuais
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ form.color.label }}</label>
+                                    {{ form.color }}
+                                    {% if form.color.errors %}
+                                    <div class="text-danger small">{{ form.color.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ form.transparency.label }}</label>
+                                    {{ form.transparency }}
+                                    {% if form.transparency.errors %}
+                                    <div class="text-danger small">{{ form.transparency.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Preview da Espécie -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-preview me-2"></i>Preview
+                            </h5>
+                        </div>
+                        <div class="card-body text-center">
+                            <div class="preview-container p-3" style="background-color: #f8f9fa; border-radius: 0.375rem;">
+                                <div class="mb-2">
+                                    <strong id="preview-name">{{ form.name.value|default:"Nome da Espécie" }}</strong>
+                                </div>
+                                <div class="mb-2">
+                                    <code id="preview-formula" class="bg-white p-2 rounded">{{ form.formula.value|default:"Fórmula" }}</code>
+                                </div>
+                                <div class="mb-2">
+                                    <span id="preview-role" class="badge bg-info">{{ form.simulation_role.value|default:"reactant" }}</span>
+                                    <span id="preview-state" class="badge bg-secondary">{{ form.physical_state.value|default:"aqueous" }}</span>
+                                </div>
+                                <div class="small text-muted">
+                                    <span id="preview-weight">{{ form.molecular_weight.value|default:"0" }}</span> g/mol
+                                    •
+                                    <span id="preview-concentration">{{ form.default_concentration.value|default:"0" }}</span> M
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botões de ação -->
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{% if species %}{% url 'species_detail' species.pk %}{% else %}{% url 'species_list' %}{% endif %}" 
+                   class="btn btn-secondary">
+                    <i class="fas fa-times me-1"></i>Cancelar
+                </a>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-1"></i>
+                    {% if species %}Atualizar Espécie{% else %}Criar Espécie{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Preview em tempo real
+    const fields = ['name', 'formula', 'molecular_weight', 'default_concentration', 'simulation_role', 'physical_state'];
+    
+    fields.forEach(field => {
+        const input = document.querySelector(`#id_${field}`);
+        if (input) {
+            input.addEventListener('input', updatePreview);
+            input.addEventListener('change', updatePreview);
+        }
+    });
+    
+    function updatePreview() {
+        const name = document.querySelector('#id_name').value || 'Nome da Espécie';
+        const formula = document.querySelector('#id_formula').value || 'Fórmula';
+        const weight = document.querySelector('#id_molecular_weight').value || '0';
+        const concentration = document.querySelector('#id_default_concentration').value || '0';
+        const role = document.querySelector('#id_simulation_role');
+        const state = document.querySelector('#id_physical_state');
+        
+        document.querySelector('#preview-name').textContent = name;
+        document.querySelector('#preview-formula').textContent = formula;
+        document.querySelector('#preview-weight').textContent = weight;
+        document.querySelector('#preview-concentration').textContent = concentration;
+        document.querySelector('#preview-role').textContent = role.options[role.selectedIndex].text;
+        document.querySelector('#preview-state').textContent = state.options[state.selectedIndex].text;
+    }
+    
+    // Auto-resize textarea
+    const textarea = document.querySelector('#id_description');
+    if (textarea) {
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = this.scrollHeight + 'px';
+        });
+    }
+});
+</script>
+{% endblock %}

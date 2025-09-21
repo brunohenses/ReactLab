@@ -87,3 +87,150 @@ class ReactionTemplateForm(forms.ModelForm):
                 )
         
         return cleaned_data
+    
+class SpeciesForm(forms.ModelForm):
+    class Meta:
+        model = Species
+        fields = [
+            'name', 'formula', 'molecular_weight', 'density', 'physical_state',
+            'default_concentration', 'simulation_role', 'color', 'transparency',
+            'description', 'cas_number'
+        ]
+        
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome da espécie (ex: Água, Cloreto de Sódio)'
+            }),
+            'formula': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'H2O, NaCl, HCl'
+            }),
+            'molecular_weight': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.001',
+                'min': '0.1',
+                'placeholder': '18.015'
+            }),
+            'density': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.001',
+                'min': '0.001',
+                'placeholder': '1.000'
+            }),
+            'physical_state': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'default_concentration': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.0001',
+                'min': '0.0001',
+                'max': '100',
+                'placeholder': '1.0'
+            }),
+            'simulation_role': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'color': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'transparency': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Descrição da espécie química...'
+            }),
+            'cas_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '7732-18-5',
+                'pattern': '[0-9]{2,7}-[0-9]{2}-[0-9]'
+            })
+        }
+        
+        labels = {
+            'name': 'Nome',
+            'formula': 'Fórmula Química',
+            'molecular_weight': 'Peso Molecular (g/mol)',
+            'density': 'Densidade (g/cm³)',
+            'physical_state': 'Estado Físico (25°C)',
+            'default_concentration': 'Concentração Padrão Sugerida (mol·L⁻¹)',
+            'simulation_role': 'Papel na Simulação',
+            'color': 'Cor',
+            'transparency': 'Transparência',
+            'description': 'Descrição',
+            'cas_number': 'Número CAS'
+        }
+        
+        help_texts = {
+            'molecular_weight': 'Peso molecular em gramas por mol',
+            'density': 'Densidade a 25°C (opcional para gases)',
+            'default_concentration': 'Concentração típica para simulações',
+            'cas_number': 'Número de registro CAS (formato: XXXXX-XX-X)'
+        }
+
+    def clean_cas_number(self):
+        cas_number = self.cleaned_data.get('cas_number', '').strip()
+        if cas_number:
+            # Validação básica do formato CAS
+            import re
+            if not re.match(r'^\d{2,7}-\d{2}-\d$', cas_number):
+                raise forms.ValidationError(
+                    "Formato de CAS inválido. Use o formato: XXXXX-XX-X (ex: 7732-18-5)"
+                )
+        return cas_number
+
+    def clean_formula(self):
+        formula = self.cleaned_data.get('formula', '').strip()
+        if not formula:
+            raise forms.ValidationError("Fórmula química é obrigatória.")
+        
+        # Validação básica da fórmula (apenas caracteres permitidos)
+        import re
+        if not re.match(r'^[A-Za-z0-9\(\)\[\]\+\-\·\s]+$', formula):
+            raise forms.ValidationError(
+                "Fórmula contém caracteres inválidos. Use apenas letras, números e símbolos químicos básicos."
+            )
+        return formula
+
+class SpeciesCSVImportForm(forms.Form):
+    csv_file = forms.FileField(
+        label='Arquivo CSV',
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': '.csv'
+        }),
+        help_text='Selecione um arquivo CSV com as espécies químicas'
+    )
+    
+    def clean_csv_file(self):
+        csv_file = self.cleaned_data['csv_file']
+        
+        # Verificar extensão
+        if not csv_file.name.endswith('.csv'):
+            raise forms.ValidationError("Arquivo deve ter extensão .csv")
+        
+        # Verificar tamanho (máximo 5MB)
+        if csv_file.size > 5 * 1024 * 1024:
+            raise forms.ValidationError("Arquivo muito grande. Máximo permitido: 5MB")
+        
+        # Verificar se é um arquivo de texto válido
+        try:
+            csv_file.seek(0)
+            sample = csv_file.read(1024).decode('utf-8')
+            csv_file.seek(0)
+            
+            # Verificar se tem cabeçalho esperado
+            required_headers = ['name', 'formula', 'molecular_weight', 'default_concentration']
+            if not all(header in sample.lower() for header in required_headers):
+                raise forms.ValidationError(
+                    f"CSV deve conter pelo menos os cabeçalhos: {', '.join(required_headers)}"
+                )
+                
+        except UnicodeDecodeError:
+            raise forms.ValidationError("Arquivo deve estar codificado em UTF-8")
+        except Exception:
+            raise forms.ValidationError("Arquivo CSV inválido")
+        
+        return csv_file

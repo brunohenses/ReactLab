@@ -1,0 +1,162 @@
+{% extends 'chemical_simulator/base.html' %}
+
+{% block title %}Importar Espécies CSV - Simulador Químico{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-file-import me-2"></i>Importar Espécies via CSV</h2>
+            <a href="{% url 'species_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Voltar
+            </a>
+        </div>
+
+        <!-- Instruções -->
+        <div class="alert alert-info mb-4">
+            <h6><i class="fas fa-info-circle me-2"></i>Como usar:</h6>
+            <ol class="mb-0">
+                <li>Baixe o template CSV clicando no botão abaixo</li>
+                <li>Preencha o arquivo com os dados das espécies químicas</li>
+                <li>Faça upload do arquivo preenchido</li>
+            </ol>
+        </div>
+
+        <!-- Formulário -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Upload do Arquivo</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {{ form.non_field_errors }}
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-4">
+                        <label class="form-label">{{ form.csv_file.label }}</label>
+                        {{ form.csv_file }}
+                        {% if form.csv_file.errors %}
+                        <div class="text-danger small mt-1">{{ form.csv_file.errors }}</div>
+                        {% endif %}
+                        {% if form.csv_file.help_text %}
+                        <div class="form-text">{{ form.csv_file.help_text }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'species_csv_template' %}" class="btn btn-info">
+                            <i class="fas fa-download me-1"></i>Baixar Template CSV
+                        </a>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload me-1"></i>Importar Espécies
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Formato do CSV -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-table me-2"></i>Formato do CSV
+                </h6>
+            </div>
+            <div class="card-body">
+                <p>O arquivo CSV deve conter as seguintes colunas:</p>
+                
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Coluna</th>
+                                <th>Obrigatório</th>
+                                <th>Tipo</th>
+                                <th>Exemplo</th>
+                                <th>Descrição</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>name</code></td>
+                                <td><span class="badge bg-danger">Sim</span></td>
+                                <td>Texto</td>
+                                <td>Água</td>
+                                <td>Nome da espécie química</td>
+                            </tr>
+                            <tr>
+                                <td><code>formula</code></td>
+                                <td><span class="badge bg-danger">Sim</span></td>
+                                <td>Texto</td>
+                                <td>H2O</td>
+                                <td>Fórmula química</td>
+                            </tr>
+                            <tr>
+                                <td><code>molecular_weight</code></td>
+                                <td><span class="badge bg-danger">Sim</span></td>
+                                <td>Número</td>
+                                <td>18.015</td>
+                                <td>Peso molecular (g/mol)</td>
+                            </tr>
+                            <tr>
+                                <td><code>default_concentration</code></td>
+                                <td><span class="badge bg-danger">Sim</span></td>
+                                <td>Número</td>
+                                <td>55.56</td>
+                                <td>Concentração padrão (mol/L)</td>
+                            </tr>
+                            <tr>
+                                <td><code>density</code></td>
+                                <td><span class="badge bg-warning">Opcional</span></td>
+                                <td>Número</td>
+                                <td>1.0</td>
+                                <td>Densidade (g/cm³)</td>
+                            </tr>
+                            <tr>
+                                <td><code>physical_state</code></td>
+                                <td><span class="badge bg-warning">Opcional</span></td>
+                                <td>Texto</td>
+                                <td>liquid</td>
+                                <td>solid, liquid, gas, aqueous</td>
+                            </tr>
+                            <tr>
+                                <td><code>simulation_role</code></td>
+                                <td><span class="badge bg-warning">Opcional</span></td>
+                                <td>Texto</td>
+                                <td>reactant</td>
+                                <td>reactant, product, catalyst, etc.</td>
+                            </tr>
+                            <tr>
+                                <td><code>color</code></td>
+                                <td><span class="badge bg-warning">Opcional</span></td>
+                                <td>Texto</td>
+                                <td>incolor</td>
+                                <td>incolor, white, yellow, etc.</td>
+                            </tr>
+                            <tr>
+                                <td><code>cas_number</code></td>
+                                <td><span class="badge bg-warning">Opcional</span></td>
+                                <td>Texto</td>
+                                <td>7732-18-5</td>
+                                <td>Número de registro CAS</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Atenção:</strong> Espécies com nomes duplicados serão ignoradas. 
+                    Certifique-se de que os dados estão corretos antes de importar.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
