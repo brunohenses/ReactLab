@@ -28,6 +28,9 @@ urlpatterns = [
     path('species/quick-add/', views.species_quick_add, name='species_quick_add'),
     path('api/species-suggestions/', views.template_species_suggestions, name='template_species_suggestions'),
     
-    # Placeholder URLs para Simulations (vamos criar depois)
+    # Simulation URLs
     path('simulations/', views.simulation_list, name='simulation_list'),
+    path('simulations/create/', views.simulation_create, name='simulation_create'),
+    path('simulations/create/<int:template_pk>/', views.simulation_create, name='simulation_create_with_template'),
+    path('simulations/<int:pk>/', views.simulation_detail, name='simulation_detail'),
 ]

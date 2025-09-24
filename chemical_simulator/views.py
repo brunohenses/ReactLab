@@ -1,13 +1,16 @@
 import csv
 import io
+import traceback
+import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
-from .models import ReactionTemplate, Species
-from .forms import ReactionTemplateForm, SpeciesForm, SpeciesCSVImportForm, TemplateSpeciesAssociationForm
+from .models import ReactionTemplate, Species, SimulationRun
+from .forms import ReactionTemplateForm, SpeciesForm, SpeciesCSVImportForm, TemplateSpeciesAssociationForm, SimulationRunForm
+from .simulation_engine import create_and_run_simulation, SimulationError
 
 # Create your views here.
 
@@ -58,13 +61,31 @@ def reaction_template_detail(request, pk):
 def reaction_template_create(request):
     """Criar novo template de reação"""
     if request.method == 'POST':
+        print("\n=== DEBUG POST ===")
+        print("Reactants recebidos:", request.POST.getlist('reactants'))
+        print("Products recebidos:", request.POST.getlist('products'))
+        print("Todos os dados POST:", dict(request.POST))
+        print("==================\n")
+
         form = ReactionTemplateForm(request.POST)
+        print("Formulário é válido?", form.is_valid())
+
+        if not form.is_valid():
+            print("Erros do formulário (detalhados):")
+            for field, errors in form.errors.items():
+                print(f"  {field}: {list(errors)}")
+            
+            # Debug: verificar querysets
+            print("IDs disponíveis para reactants:", list(form.fields['reactants'].queryset.values_list('id', flat=True)))
+            print("IDs disponíveis para products:", list(form.fields['products'].queryset.values_list('id', flat=True)))
+        
         if form.is_valid():
             template = form.save(commit=False)
             template.created_by = request.user
             template.save()
             form.save_m2m()  # Salvar relações many-to-many
             messages.success(request, f'Template "{template.name}" criado com sucesso!')
+            print(f"Template salvo com PK: {template.pk}")
             return redirect('reaction_template_detail', pk=template.pk)
     else:
         form = ReactionTemplateForm()
@@ -246,58 +267,167 @@ def species_delete(request, pk):
 
 @login_required
 def species_csv_import(request):
-    """Importar espécies via CSV"""
+    """Importar espécies via CSV com debug melhorado"""
     if request.method == 'POST':
         form = SpeciesCSVImportForm(request.POST, request.FILES)
         if form.is_valid():
             csv_file = request.FILES['csv_file']
             
             try:
+                # Debug: mostrar info do arquivo
+                print(f"DEBUG: Arquivo: {csv_file.name}, Tamanho: {csv_file.size} bytes")
+                
                 # Ler arquivo CSV
-                file_data = csv_file.read().decode('utf-8')
-                csv_data = csv.DictReader(io.StringIO(file_data))
+                csv_file.seek(0)
+                file_data = csv_file.read().decode('utf-8-sig')  # utf-8-sig para BOM
+                print(f"DEBUG: Primeiros 500 chars: {file_data[:500]}")
+                
+                # Detectar delimitador
+                import csv
+                sniffer = csv.Sniffer()
+                try:
+                    delimiter = sniffer.sniff(file_data[:1024]).delimiter
+                    print(f"DEBUG: Delimitador detectado: '{delimiter}'")
+                except:
+                    delimiter = ';'  # Padrão europeu
+                    print(f"DEBUG: Usando delimitador padrão: '{delimiter}'")
+                
+                csv_data = csv.DictReader(io.StringIO(file_data), delimiter=delimiter)
+                
+                # Debug: mostrar cabeçalhos
+                fieldnames = csv_data.fieldnames
+                print(f"DEBUG: Cabeçalhos encontrados: {fieldnames}")
                 
                 created_count = 0
                 error_count = 0
                 errors = []
+
+                # Mapeamentos melhorados
+                physical_state_map = {
+                    'líquido': 'liquid',
+                    'sólido': 'solid', 
+                    'gasoso': 'gas',
+                    'aquoso': 'aqueous',
+                    'liquid': 'liquid',
+                    'solid': 'solid',
+                    'gas': 'gas',
+                    'aqueous': 'aqueous'
+                }
+                
+                role_map = {
+                    'reagente': 'reactant',
+                    'produto': 'product',
+                    'catalisador': 'catalyst',
+                    'solvente': 'solvent',
+                    'intermediário': 'intermediate',
+                    'reactant': 'reactant',
+                    'product': 'product',
+                    'catalyst': 'catalyst',
+                    'solvent': 'solvent',
+                    'intermediate': 'intermediate'
+                }
+                
+                color_map = {
+                    'branco': 'white',
+                    'azul': 'blue',
+                    'verde': 'green',
+                    'amarelo': 'yellow',
+                    'vermelho': 'red',
+                    'castanho': 'brown',
+                    'preto': 'black',
+                    'roxo': 'purple',
+                    'laranja': 'orange',
+                    'incolor': 'incolor',
+                    'white': 'white',
+                    'blue': 'blue',
+                    'green': 'green',
+                    'yellow': 'yellow',
+                    'red': 'red',
+                    'brown': 'brown',
+                    'black': 'black',
+                    'purple': 'purple',
+                    'orange': 'orange'
+                }
+                
+                transparency_map = {
+                    'transparente': 'transparent',
+                    'translúcido': 'translucent',
+                    'opaco': 'opaque',
+                    'transparent': 'transparent',
+                    'translucent': 'translucent',
+                    'opaque': 'opaque'
+                }
                 
                 for row_num, row in enumerate(csv_data, start=2):
                     try:
+                        print(f"DEBUG: Linha {row_num}: {dict(row)}")
+                        
+                        # Função para encontrar campo por similiaridade
+                        def find_field(target_names, row_dict):
+                            for target in target_names:
+                                for key in row_dict.keys():
+                                    if target.lower() in key.lower():
+                                        return row_dict[key]
+                            return None
+                        
+                        # Mapear campos de forma flexível
+                        name = find_field(['nome', 'name'], row)
+                        formula = find_field(['fórmula', 'formula'], row)
+                        molecular_weight = find_field(['peso molecular', 'molecular_weight'], row)
+                        default_concentration = find_field(['concentração', 'concentration'], row)
+                        density = find_field(['densidade', 'density'], row)
+                        physical_state = find_field(['estado físico', 'physical_state'], row)
+                        simulation_role = find_field(['papel', 'role', 'simulation_role'], row)
+                        color = find_field(['cor', 'color'], row)
+                        transparency = find_field(['transparência', 'transparency'], row)
+                        description = find_field(['descrição', 'description'], row)
+                        cas_number = find_field(['cas', 'número cas'], row)
+                        
+                        print(f"DEBUG: Campos mapeados - name: {name}, formula: {formula}")
+                        
                         # Validar campos obrigatórios
-                        if not all([row.get('name'), row.get('formula'), row.get('molecular_weight'), row.get('default_concentration')]):
-                            errors.append(f"Linha {row_num}: Campos obrigatórios em falta")
+                        if not all([name, formula, molecular_weight, default_concentration]):
+                            errors.append(f"Linha {row_num}: Campos obrigatórios em falta - name: {name}, formula: {formula}, weight: {molecular_weight}, conc: {default_concentration}")
                             error_count += 1
                             continue
                         
                         # Verificar se já existe
-                        if Species.objects.filter(name=row['name']).exists():
-                            errors.append(f"Linha {row_num}: Espécie '{row['name']}' já existe")
+                        if Species.objects.filter(name=name.strip()).exists():
+                            errors.append(f"Linha {row_num}: Espécie '{name}' já existe")
                             error_count += 1
                             continue
                         
-                        # Criar espécie
+                        # Processar números (trocar vírgula por ponto)
+                        def clean_number(value):
+                            if not value:
+                                return None
+                            return float(str(value).replace(',', '.').strip())
+                        
+                        # Criar dados da espécie
                         species_data = {
-                            'name': row['name'].strip(),
-                            'formula': row['formula'].strip(),
-                            'molecular_weight': float(row['molecular_weight']),
-                            'default_concentration': float(row['default_concentration']),
-                            'density': float(row.get('density', 0)) if row.get('density') else None,
-                            'physical_state': row.get('physical_state', 'aqueous'),
-                            'simulation_role': row.get('simulation_role', 'reactant'),
-                            'color': row.get('color', 'incolor'),
-                            'transparency': row.get('transparency', 'transparent'),
-                            'description': row.get('description', ''),
-                            'cas_number': row.get('cas_number', ''),
+                            'name': name.strip(),
+                            'formula': formula.strip(),
+                            'molecular_weight': clean_number(molecular_weight),
+                            'default_concentration': clean_number(default_concentration),
+                            'density': clean_number(density) if density else None,
+                            'physical_state': physical_state_map.get(physical_state.lower().strip() if physical_state else '', 'aqueous'),
+                            'simulation_role': role_map.get(simulation_role.lower().strip() if simulation_role else '', 'reactant'),
+                            'color': color_map.get(color.lower().strip() if color else '', 'incolor'),
+                            'transparency': transparency_map.get(transparency.lower().strip() if transparency else '', 'transparent'),
+                            'description': description.strip() if description else '',
+                            'cas_number': cas_number.strip() if cas_number else '',
                         }
+                        
+                        print(f"DEBUG: Dados finais: {species_data}")
                         
                         Species.objects.create(**species_data)
                         created_count += 1
+                        print(f"DEBUG: Espécie '{name}' criada com sucesso")
                         
-                    except (ValueError, TypeError) as e:
-                        errors.append(f"Linha {row_num}: Erro de dados - {str(e)}")
-                        error_count += 1
                     except Exception as e:
-                        errors.append(f"Linha {row_num}: Erro inesperado - {str(e)}")
+                        error_msg = f"Linha {row_num}: Erro - {str(e)}"
+                        errors.append(error_msg)
+                        print(f"DEBUG: {error_msg}")
                         error_count += 1
                 
                 # Mensagens de resultado
@@ -306,7 +436,7 @@ def species_csv_import(request):
                 
                 if error_count > 0:
                     messages.warning(request, f'{error_count} erro(s) encontrado(s).')
-                    for error in errors[:5]:  # Mostrar apenas os primeiros 5 erros
+                    for error in errors[:5]:
                         messages.error(request, error)
                     if len(errors) > 5:
                         messages.info(request, f'... e mais {len(errors) - 5} erro(s).')
@@ -315,7 +445,14 @@ def species_csv_import(request):
                     return redirect('species_list')
                     
             except Exception as e:
-                messages.error(request, f'Erro ao processar arquivo CSV: {str(e)}')
+                error_msg = f'Erro ao processar arquivo CSV: {str(e)}'
+                messages.error(request, error_msg)
+                print(f"DEBUG: {error_msg}")
+                import traceback
+                print(f"DEBUG: Traceback: {traceback.format_exc()}")
+        else:
+            print(f"DEBUG: Formulário inválido: {form.errors}")
+            messages.error(request, f"Erro no formulário: {form.errors}")
     else:
         form = SpeciesCSVImportForm()
     
@@ -324,33 +461,28 @@ def species_csv_import(request):
         'title': 'Importar Espécies via CSV'
     })
 
-
 def species_csv_template(request):
     """Download template CSV para importação"""
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="species_template.csv"'
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="especies_template.csv"'
     
     writer = csv.writer(response)
     
-    # Cabeçalho
+    # Cabeçalho em português (igual ao teu arquivo)
     writer.writerow([
-        'name', 'formula', 'molecular_weight', 'default_concentration',
-        'density', 'physical_state', 'simulation_role', 'color', 
-        'transparency', 'description', 'cas_number'
+        'Nome', 'Fórmula Química', 'Peso Molecular (g/mol)', 'Densidade (g/cm³) (a 25ºC)',
+        'Estado Físico (25°C)', 'Concentração Padrão Sugerida (mol·L⁻¹)', 'Papel na Simulação',
+        'Cor', 'Transparência', 'Descrição', 'Número CAS'
     ])
     
     # Exemplos
     writer.writerow([
-        'Água', 'H2O', '18.015', '55.56', '1.0', 'liquid', 'solvent', 
-        'incolor', 'transparent', 'Água destilada', '7732-18-5'
+        'Água', 'H2O', '18,015', '0,997', 'líquido', '55,56', 'solvente', 
+        'incolor', 'transparente', 'Água destilada', '7732-18-5'
     ])
     writer.writerow([
-        'Cloreto de Sódio', 'NaCl', '58.443', '1.0', '2.16', 'solid', 
-        'reactant', 'white', 'opaque', 'Sal comum', '7647-14-5'
-    ])
-    writer.writerow([
-        'Ácido Clorídrico', 'HCl', '36.458', '0.1', '1.18', 'aqueous', 
-        'reactant', 'incolor', 'transparent', 'Ácido forte', '7647-01-0'
+        'Cloreto de Sódio', 'NaCl', '58,443', '2,165', 'sólido', '0,154', 
+        'reagente', 'branco', 'transparente', 'Sal comum', '7647-14-5'
     ])
     
     return response
@@ -495,3 +627,99 @@ def template_species_suggestions(request):
             'concentration': s.default_concentration
         } for s in suggestions]
     })
+
+def simulation_list(request):
+    """Lista de simulações do utilizador"""
+    simulations = SimulationRun.objects.all().select_related('template', 'created_by').order_by('-created_at')
+    
+    # Filtrar por utilizador se não for staff
+    if not request.user.is_staff:
+        simulations = simulations.filter(created_by=request.user)
+    
+    # Filtros
+    status = request.GET.get('status')
+    if status:
+        simulations = simulations.filter(status=status)
+    
+    template_id = request.GET.get('template')
+    if template_id:
+        simulations = simulations.filter(template_id=template_id)
+    
+    # Paginação
+    paginator = Paginator(simulations, 15)
+    page_number = request.GET.get('page')
+    simulations = paginator.get_page(page_number)
+    
+    context = {
+        'simulations': simulations,
+        'status': status,
+        'template_id': template_id,
+        'status_choices': SimulationRun.StatusChoices.choices,
+        'templates': ReactionTemplate.objects.filter(is_active=True)
+    }
+    return render(request, 'chemical_simulator/simulation_list.html', context)
+
+
+@login_required
+def simulation_create(request, template_pk=None):
+    """Criar nova simulação"""
+    template = None
+    if template_pk:
+        template = get_object_or_404(ReactionTemplate, pk=template_pk, is_active=True)
+    
+    if request.method == 'POST':
+        form = SimulationRunForm(request.POST, template=template)
+        if form.is_valid():
+            try:
+                # Executar simulação
+                simulation_run, error = create_and_run_simulation(
+                    template=form.cleaned_data['template'],
+                    initial_concentrations=form.cleaned_data['initial_concentrations'],
+                    time_span=form.cleaned_data['time_span'],
+                    time_points=form.cleaned_data['time_points'],
+                    user=request.user
+                )
+                
+                if error:
+                    messages.error(request, f'Erro na simulação: {error}')
+                else:
+                    messages.success(request, 'Simulação executada com sucesso!')
+                    return redirect('simulation_detail', pk=simulation_run.pk)
+                    
+            except Exception as e:
+                messages.error(request, f'Erro inesperado: {str(e)}')
+    else:
+        form = SimulationRunForm(template=template)
+    
+    context = {
+        'form': form,
+        'template': template,
+        'title': f'Nova Simulação{" - " + template.name if template else ""}',
+        'reaction_order': template.reaction_order if template else None,
+        'rate_constant': template.rate_constant if template else None,
+        'kinetic_law': template.get_reaction_order_display() if template else None,
+    }
+    return render(request, 'chemical_simulator/simulation_form.html', context)
+
+
+def simulation_detail(request, pk):
+    """Detalhes da simulação com visualização"""
+    simulation = get_object_or_404(SimulationRun, pk=pk)
+    
+    try:
+        resolution = simulation.time_span / simulation.time_points
+    except (ZeroDivisionError, TypeError):
+        resolution = 0
+
+    # Verificar permissões
+    if not request.user.is_staff and simulation.created_by != request.user:
+        messages.error(request, 'Não tens permissão para ver esta simulação.')
+        return redirect('simulation_list')
+    
+    context = {
+        'simulation': simulation,
+        'resolution': resolution,
+        'has_results': simulation.results is not None,
+        'template': simulation.template
+    }
+    return render(request, 'chemical_simulator/simulation_detail.html', context)

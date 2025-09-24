@@ -1,0 +1,413 @@
+{% extends 'chemical_simulator/base.html' %}
+
+{% block title %}{{ simulation.name }} - Simulador Químico{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h2>{{ simulation.name }}</h2>
+        <p class="text-muted mb-0">
+            <span class="badge bg-info">{{ simulation.template.get_reaction_order_display }}</span>
+            <span class="mx-2">•</span>
+            <i class="fas fa-user me-1"></i>{{ simulation.created_by.username }}
+            <span class="mx-2">•</span>
+            <i class="fas fa-calendar me-1"></i>{{ simulation.created_at|date:"d/m/Y H:i" }}
+        </p>
+    </div>
+    
+    <div class="btn-group">
+        <a href="{% url 'simulation_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Voltar
+        </a>
+        {% if user == simulation.created_by or user.is_staff %}
+        <button type="button" class="btn btn-primary" onclick="exportResults()">
+            <i class="fas fa-download me-1"></i>Exportar
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Status da Simulação -->
+<div class="row mb-4">
+    <div class="col-12">
+        {% if simulation.status == 'completed' %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle me-2"></i>
+            Simulação concluída com sucesso em {{ simulation.completed_at|date:"d/m/Y H:i:s" }}
+        </div>
+        {% elif simulation.status == 'failed' %}
+        <div class="alert alert-danger">
+            <i class="fas fa-times-circle me-2"></i>
+            Simulação falhada: {{ simulation.error_message }}
+        </div>
+        {% elif simulation.status == 'running' %}
+        <div class="alert alert-warning">
+            <i class="fas fa-spinner me-2"></i>
+            Simulação em execução...
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Informações da Reação -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Reação Simulada</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Template:</strong> {{ simulation.template.name }}<br>
+                        <strong>Ordem:</strong> {{ simulation.template.get_reaction_order_display }}<br>
+                        <strong>Constante k:</strong> {{ simulation.template.rate_constant }} s⁻¹
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Tempo total:</strong> {{ simulation.time_span }} s<br>
+                        <strong>Pontos temporais:</strong> {{ simulation.time_points }}<br>
+                        <strong>Resolução:</strong> {{ simulation.time_span|floatformat:1 }}s / {{ simulation.time_points }} = {{ resolution|floatformat:3 }}s
+                    </div>
+                </div>
+                
+                <!-- Equação química -->
+                <div class="mt-3 p-3 bg-light rounded text-center">
+                    <div class="equation-display fs-5">
+                        {% for reactant in simulation.template.reactants.all %}
+                        {{ reactant.formula }}{% if not forloop.last %} + {% endif %}
+                        {% endfor %}
+                        
+                        <span class="mx-3">→</span>
+                        
+                        {% for product in simulation.template.products.all %}
+                        {{ product.formula }}{% if not forloop.last %} + {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Lei Cinética</h6>
+            </div>
+            <div class="card-body text-center">
+                {% if simulation.template.reaction_order == 1 %}
+                <div class="mb-2">-d[A]/dt = k[A]</div>
+                <small class="text-muted">[A](t) = [A]₀ × e^(-kt)</small>
+                {% elif simulation.template.reaction_order == 2 %}
+                <div class="mb-2">-d[A]/dt = k[A]²</div>
+                <small class="text-muted">1/[A](t) - 1/[A]₀ = kt</small>
+                {% elif simulation.template.reaction_order == 3 %}
+                <div class="mb-2">-d[A]/dt = k[A]³</div>
+                <small class="text-muted">1/[A]²(t) - 1/[A]²₀ = 2kt</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resultados -->
+{% if has_results %}
+<div class="row">
+    <!-- Gráfico Principal -->
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Evolução das Concentrações</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="concentrationChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Dados Numéricos -->
+    <div class="col-lg-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Concentrações (mol·L⁻¹)</h6>
+            </div>
+            <div class="card-body">
+                <div id="concentrations-table" style="max-height: 400px; overflow-y: auto;">
+                    <!-- Preenchido via JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Comparação Analítica (se disponível) -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Comparação Numérica vs Analítica</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="comparisonChart" width="400" height="150"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Estatísticas -->
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Estatísticas da Simulação</h6>
+            </div>
+            <div class="card-body">
+                <div id="simulation-stats">
+                    <!-- Preenchido via JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Dados da Execução</h6>
+            </div>
+            <div class="card-body">
+                <small class="text-muted">
+                    <div><strong>ID da Simulação:</strong> #{{ simulation.pk }}</div>
+                    <div><strong>Criado:</strong> {{ simulation.created_at|date:"d/m/Y H:i:s" }}</div>
+                    {% if simulation.completed_at %}
+                    <div><strong>Concluído:</strong> {{ simulation.completed_at|date:"d/m/Y H:i:s" }}</div>
+                    {% endif %}
+                    <div><strong>Motor:</strong> SciPy ODE Solver</div>
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<div class="text-center py-5">
+    <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+    <h4 class="text-muted">Sem resultados disponíveis</h4>
+    <p class="text-muted">A simulação ainda não foi executada ou falhou.</p>
+</div>
+{% endif %}
+
+<!-- Dados da simulação (hidden para JavaScript) -->
+{% if has_results %}
+<script type="application/json" id="simulation-data">
+{{ simulation.results|safe }}
+</script>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if has_results %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const simulationData = JSON.parse(document.getElementById('simulation-data').textContent);
+    
+    createConcentrationChart(simulationData);
+    createComparisonChart(simulationData);
+    displayConcentrationsTable(simulationData);
+    displaySimulationStats(simulationData);
+});
+
+function createConcentrationChart(data) {
+    const ctx = document.getElementById('concentrationChart').getContext('2d');
+    
+    const datasets = [];
+    const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
+    let colorIndex = 0;
+    
+    for (const [speciesId, speciesData] of Object.entries(data.species_data)) {
+        datasets.push({
+            label: `${speciesData.name} (${speciesData.formula})`,
+            data: speciesData.concentrations,
+            borderColor: colors[colorIndex % colors.length],
+            backgroundColor: colors[colorIndex % colors.length] + '20',
+            fill: false,
+            tension: 0.1
+        });
+        colorIndex++;
+    }
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.time,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Tempo (s)'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Concentração (mol·L⁻¹)'
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Evolução das Concentrações ao Longo do Tempo'
+                }
+            }
+        }
+    });
+}
+
+function createComparisonChart(data) {
+    if (!data.analytical_solution) {
+        document.getElementById('comparisonChart').style.display = 'none';
+        return;
+    }
+    
+    const ctx = document.getElementById('comparisonChart').getContext('2d');
+    
+    // Encontrar a espécie principal (primeiro reagente)
+    const mainSpecies = Object.values(data.species_data).find(s => s.role === 'reactant');
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.time,
+            datasets: [
+                {
+                    label: 'Numérico (ODE)',
+                    data: mainSpecies.concentrations,
+                    borderColor: '#FF6384',
+                    backgroundColor: '#FF638420',
+                    fill: false
+                },
+                {
+                    label: 'Analítico',
+                    data: data.analytical_solution.concentration,
+                    borderColor: '#36A2EB',
+                    backgroundColor: '#36A2EB20',
+                    borderDash: [5, 5],
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { title: { display: true, text: 'Tempo (s)' } },
+                y: { title: { display: true, text: 'Concentração (mol·L⁻¹)' } }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: `Comparação: ${data.analytical_solution.species_name}`
+                }
+            }
+        }
+    });
+}
+
+function displayConcentrationsTable(data) {
+    const container = document.getElementById('concentrations-table');
+    
+    let html = '<table class="table table-sm"><thead><tr><th>Espécie</th><th>Inicial</th><th>Final</th><th>Δ</th></tr></thead><tbody>';
+    
+    for (const [speciesId, speciesData] of Object.entries(data.species_data)) {
+        const initial = speciesData.initial_concentration;
+        const final = speciesData.final_concentration;
+        const delta = final - initial;
+        const deltaClass = delta > 0 ? 'text-success' : delta < 0 ? 'text-danger' : 'text-muted';
+        
+        html += `
+            <tr>
+                <td><strong>${speciesData.name}</strong><br><small>${speciesData.formula}</small></td>
+                <td>${initial.toFixed(4)}</td>
+                <td>${final.toFixed(4)}</td>
+                <td class="${deltaClass}">${delta.toFixed(4)}</td>
+            </tr>
+        `;
+    }
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function displaySimulationStats(data) {
+    const container = document.getElementById('simulation-stats');
+    
+    // Calcular estatísticas
+    const totalTime = Math.max(...data.time);
+    const timeStep = data.time[1] - data.time[0];
+    
+    let html = `
+        <div class="row text-center">
+            <div class="col-6">
+                <div class="h4 text-primary">${totalTime.toFixed(1)}</div>
+                <small>Tempo Total (s)</small>
+            </div>
+            <div class="col-6">
+                <div class="h4 text-info">${timeStep.toFixed(3)}</div>
+                <small>Δt médio (s)</small>
+            </div>
+        </div>
+        <hr>
+        <div class="row text-center">
+            <div class="col-6">
+                <div class="h5 text-success">${data.time.length}</div>
+                <small>Pontos Calculados</small>
+            </div>
+            <div class="col-6">
+                <div class="h5 text-warning">${Object.keys(data.species_data).length}</div>
+                <small>Espécies</small>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function exportResults() {
+    const data = JSON.parse(document.getElementById('simulation-data').textContent);
+    
+    // Criar CSV
+    let csv = 'Tempo (s)';
+    
+    // Cabeçalhos das espécies
+    for (const [speciesId, speciesData] of Object.entries(data.species_data)) {
+        csv += `,${speciesData.name} (${speciesData.formula}) [mol/L]`;
+    }
+    csv += '\n';
+    
+    // Dados
+    for (let i = 0; i < data.time.length; i++) {
+        csv += data.time[i].toFixed(6);
+        
+        for (const [speciesId, speciesData] of Object.entries(data.species_data)) {
+            csv += `,${speciesData.concentrations[i].toFixed(8)}`;
+        }
+        csv += '\n';
+    }
+    
+    // Download
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `simulacao_${new Date().getTime()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+</script>
+{% endif %}
+{% endblock %}

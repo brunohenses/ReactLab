@@ -1,11 +1,11 @@
 from django import forms
-from django.forms.widgets import CheckboxSelectMultiple
-from .models import ReactionTemplate, Species
+from django.forms.widgets import SelectMultiple
+from .models import ReactionTemplate, Species, SimulationRun
 
 class ReactionTemplateForm(forms.ModelForm):
     class Meta:
         model = ReactionTemplate
-        fields = ['name', 'description', 'reaction_order', 'rate_constant', 'reactants', 'products', 'is_active']
+        fields = ['name', 'description', 'reaction_order', 'rate_constant', 'reactants', 'intermediates', 'products', 'is_active']
         
         widgets = {
             'name': forms.TextInput(attrs={
@@ -27,15 +27,22 @@ class ReactionTemplateForm(forms.ModelForm):
                 'placeholder': '0.01'
             }),
             
-            # Usar checkboxes para seleção múltipla de espécies
-            'reactants': CheckboxSelectMultiple(attrs={
-                'class': 'species-checkbox-list'
+            # Usar seleção múltipla de espécies
+            'reactants': SelectMultiple(attrs={
+                'class': 'form-control',
+                'style': 'display: none;',
             }),
-            'products': CheckboxSelectMultiple(attrs={
-                'class': 'species-checkbox-list'
+            'products': SelectMultiple(attrs={
+                'class': 'form-control',
+                'style': 'display: none;',
+            }),
+            'intermediates': SelectMultiple(attrs={
+                'class': 'form-control',
+                'style': 'display: none;',
             }),
             'is_active': forms.CheckboxInput(attrs={
-                'class': 'form-check-input'
+                'class': 'form-control',
+                'style': 'display: none;',
             })
         }
         
@@ -56,57 +63,86 @@ class ReactionTemplateForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__(*args, **kwargs)
         
-        # Organizar espécies por papel na simulação
-        reactant_species = Species.objects.filter(
-            simulation_role__in=['reactant', 'intermediate']
-        ).order_by('name')
-        
-        product_species = Species.objects.filter(
-            simulation_role__in=['product', 'intermediate']
-        ).order_by('name')
-        
-        # Adicionar todas as espécies como opção (caso user queira escolher diferente do role)
+        # Garantir que todos os campos tenham todas as espécies como opção
         all_species = Species.objects.all().order_by('name')
-        
+    
         self.fields['reactants'].queryset = all_species
+        self.fields['intermediates'].queryset = all_species
         self.fields['products'].queryset = all_species
         
-        # Adicionar classes CSS para styling
+        # Adicionar classes CSS e data attributes
         self.fields['reactants'].widget.attrs.update({
             'data-role': 'reactants',
             'data-default-filter': 'reactant,intermediate'
         })
         
+        self.fields['intermediates'].widget.attrs.update({
+            'data-role': 'intermediates',
+            'data-default-filter': 'intermediate'
+        })
+        
         self.fields['products'].widget.attrs.update({
-            'data-role': 'products', 
+            'data-role': 'products',
             'data-default-filter': 'product,intermediate'
         })
+
+        for field_name in ['reactants', 'intermediates', 'products']:
+            field = self.fields[field_name]
+            original_create_option = field.widget.create_option
+            
+            def create_option_with_role(name, value, label, selected, index, subindex=None, attrs=None):
+                option = original_create_option(name, value, label, selected, index, subindex, attrs)
+                
+                # ✅ CORREÇÃO: value pode ser um ModelChoiceIteratorValue
+                if value and hasattr(value, 'value'):
+                    pk = value.value
+                else:
+                    pk = value
+                
+                if pk:
+                    try:
+                        species = Species.objects.get(pk=pk)
+                        option['attrs']['data-role'] = species.simulation_role
+                    except Species.DoesNotExist:
+                        pass
+                return option
+            
+            field.widget.create_option = create_option_with_role
 
     def clean(self):
         cleaned_data = super().clean()
         reactants = cleaned_data.get('reactants')
         products = cleaned_data.get('products')
         
-        # Validar que há pelo menos 1 reagente e 1 produto
-        if not reactants or len(reactants) < 1:
-            raise forms.ValidationError("Selecione pelo menos 1 reagente.")
-            
-        if not products or len(products) < 1:
-            raise forms.ValidationError("Selecione pelo menos 1 produto.")
-            
-        # Verificar que reagentes e produtos não se sobrepõem
+        # Validar reagentes
+        if not reactants:
+            self.add_error('reactants', "Selecione pelo menos 1 reagente.")
+        
+        # Validar produtos
+        if not products:
+            self.add_error('products', "Selecione pelo menos 1 produto.")
+        
+        # Validar sobreposição (exceto intermediários)
         if reactants and products:
             overlap = set(reactants) & set(products)
             if overlap:
-                species_names = ', '.join([s.name for s in overlap])
-                raise forms.ValidationError(
-                    f"As seguintes espécies não podem ser reagentes e produtos simultaneamente: {species_names}"
-                )
+                non_intermediate_overlap = [
+                    s for s in overlap 
+                    if s.simulation_role != 'intermediate'
+                ]
+                if non_intermediate_overlap:
+                    species_names = ', '.join([s.name for s in non_intermediate_overlap])
+                    self.add_error(None, f"As seguintes espécies não podem ser reagentes e produtos simultaneamente: {species_names}")
         
         return cleaned_data
-
+    def clean_rate_constant(self):
+        rate_constant = self.cleaned_data.get('rate_constant')
+        if rate_constant is not None and rate_constant <= 0:
+            raise forms.ValidationError("A constante cinética deve ser maior que zero.")
+        return rate_constant
+        
 
 # Nova form para gestão rápida de associações
 class TemplateSpeciesAssociationForm(forms.Form):
@@ -276,7 +312,7 @@ class SpeciesCSVImportForm(forms.Form):
         csv_file = self.cleaned_data['csv_file']
         
         # Verificar extensão
-        if not csv_file.name.endswith('.csv'):
+        if not csv_file.name.lower().endswith('.csv'):
             raise forms.ValidationError("Arquivo deve ter extensão .csv")
         
         # Verificar tamanho (máximo 5MB)
@@ -286,19 +322,154 @@ class SpeciesCSVImportForm(forms.Form):
         # Verificar se é um arquivo de texto válido
         try:
             csv_file.seek(0)
-            sample = csv_file.read(1024).decode('utf-8')
+            # Tentar diferentes encodings
+            sample = None
+            for encoding in ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']:
+                try:
+                    csv_file.seek(0)
+                    sample = csv_file.read(1024).decode(encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if not sample:
+                raise forms.ValidationError("Não foi possível decodificar o arquivo. Verifique a codificação.")
+            
             csv_file.seek(0)
             
-            # Verificar se tem cabeçalho esperado
-            required_headers = ['name', 'formula', 'molecular_weight', 'default_concentration']
-            if not all(header in sample.lower() for header in required_headers):
+            # Verificar se tem conteúdo CSV válido (pelo menos vírgulas ou ponto e vírgula)
+            if ';' not in sample and ',' not in sample:
+                raise forms.ValidationError("Arquivo não parece ser um CSV válido (sem delimitadores)")
+            
+            # Verificação mais flexível dos cabeçalhos
+            sample_lower = sample.lower()
+            required_patterns = ['nome', 'fórmula', 'peso', 'concentração']
+            found_patterns = sum(1 for pattern in required_patterns if pattern in sample_lower)
+            
+            if found_patterns < 2:  # Pelo menos 2 dos 4 padrões obrigatórios
                 raise forms.ValidationError(
-                    f"CSV deve conter pelo menos os cabeçalhos: {', '.join(required_headers)}"
+                    f"CSV deve conter pelo menos campos relacionados a: nome, fórmula, peso molecular, concentração. "
+                    f"Encontrados apenas {found_patterns} padrões reconhecidos."
                 )
                 
         except UnicodeDecodeError:
-            raise forms.ValidationError("Arquivo deve estar codificado em UTF-8")
-        except Exception:
-            raise forms.ValidationError("Arquivo CSV inválido")
+            raise forms.ValidationError("Arquivo deve estar codificado em UTF-8, Latin-1 ou Windows-1252")
+        except Exception as e:
+            # Debug: mostrar erro específico
+            print(f"DEBUG: Erro na validação CSV: {str(e)}")
+            raise forms.ValidationError(f"Erro ao validar CSV: {str(e)}")
         
         return csv_file
+    
+class SimpleCSVImportForm(forms.Form):
+    """Formulário simplificado para debug"""
+    csv_file = forms.FileField(
+        label='Arquivo CSV',
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': '.csv,.txt'
+        }),
+        help_text='Selecione um arquivo CSV'
+    )
+    
+    def clean_csv_file(self):
+        csv_file = self.cleaned_data['csv_file']
+        print(f"DEBUG: Validando arquivo: {csv_file.name}, tamanho: {csv_file.size}")
+        
+        # Validação mínima
+        if csv_file.size > 10 * 1024 * 1024:  # 10MB
+            raise forms.ValidationError("Arquivo muito grande")
+        
+        return csv_file
+    
+class SimulationRunForm(forms.ModelForm):
+    initial_concentrations = forms.JSONField(
+        widget=forms.HiddenInput(),
+        required=False
+    )
+    
+    class Meta:
+        model = SimulationRun
+        fields = ['name', 'template', 'time_span', 'time_points']
+        
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome da simulação'
+            }),
+            'template': forms.Select(attrs={
+                'class': 'form-select'
+            }),
+            'time_span': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.1',
+                'min': '0.1',
+                'max': '1000'
+            }),
+            'time_points': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': '10',
+                'max': '1000',
+                'value': '100'
+            })
+        }
+        
+        labels = {
+            'name': 'Nome da Simulação',
+            'template': 'Template de Reação',
+            'time_span': 'Tempo de Simulação (s)',
+            'time_points': 'Pontos Temporais'
+        }
+
+    def __init__(self, *args, **kwargs):
+        template = kwargs.pop('template', None)
+        super().__init__(*args, **kwargs)
+        
+        # Filtrar apenas templates ativos
+        self.fields['template'].queryset = ReactionTemplate.objects.filter(is_active=True)
+        
+        # Se template específico fornecido, definir como padrão
+        if template:
+            self.fields['template'].initial = template
+            self.fields['name'].initial = f'Simulação {template.name}'
+
+        if template and template.reactants.exists():
+            reactants = template.reactants.all()
+            
+            for species in reactants:
+                field_name = f'initial_concentration_{species.pk}'
+                initial_value = species.default_concentration
+                
+                # ✅ Garantir que o campo não existe antes
+                if field_name not in self.fields:
+                    self.fields[field_name] = forms.FloatField(
+                        label=f"{species.name} ({species.formula})",
+                        initial=initial_value,
+                        min_value=0.0001,
+                        max_value=100.0,
+                        widget=forms.NumberInput(attrs={
+                            'class': 'form-control',
+                            'step': '0.0001',
+                            'placeholder': f'{initial_value:.4f}'
+                        })
+                    )
+
+        print("DEBUG: Campos criados no form:")
+        for field_name in self.fields:
+            if field_name.startswith('initial_concentration_'):
+                print(f"  - {field_name}")
+    
+    def clean_initial_concentrations(self):
+        concentrations = self.cleaned_data.get('initial_concentrations')
+        
+        if not concentrations:
+            # Será preenchido via JavaScript no frontend
+            return {}
+        
+        # Validar que todas as concentrações são positivas
+        for species_id, conc in concentrations.items():
+            if float(conc) < 0:
+                raise forms.ValidationError(f'Concentração deve ser positiva para espécie {species_id}')
+        
+        return concentrations    
+    

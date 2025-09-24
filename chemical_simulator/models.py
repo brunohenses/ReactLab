@@ -36,6 +36,7 @@ class Species(models.Model):
         BLACK = 'black', 'Preto'
         PURPLE = 'purple', 'Roxo'
         ORANGE = 'orange', 'Laranja'
+        GRAY = 'gray', 'Cinza'
     
     # Informações Básicas
     name = models.CharField(max_length=100, unique=True, verbose_name='Nome')
@@ -47,7 +48,7 @@ class Species(models.Model):
     
     # Propriedades Físicas
     density = models.FloatField(
-        validators=[MinValueValidator(0.001)],
+        validators=[MinValueValidator(0.00001)],
         null=True, blank=True,
         verbose_name='Densidade (g/cm³)',
         help_text='Densidade a 25°C'
@@ -119,9 +120,9 @@ class ReactionTemplate(models.Model):
     Modelo para templates de reações químicas
     """
     class OrderChoices(models.IntegerChoices):
-        FIRST = 1, '1ª Ordem'
-        SECOND = 2, '2ª Ordem' 
-        THIRD = 3, '3ª Ordem'
+        FIRST = 1, '0ª Ordem'
+        SECOND = 2, '1ª Ordem' 
+        THIRD = 3, '2ª Ordem'
 
     name = models.CharField(max_length=150, verbose_name='Nome da Reação')
     description = models.TextField(verbose_name='Descrição')
@@ -144,6 +145,12 @@ class ReactionTemplate(models.Model):
         related_name='reactions_as_product', 
         verbose_name='Produtos'
     )
+    intermediates = models.ManyToManyField(
+        Species,
+        related_name='reactions_as_intermediate',
+        verbose_name='Intermediários',
+        blank=True
+)
     
     # Constante cinética padrão
     rate_constant = models.FloatField(

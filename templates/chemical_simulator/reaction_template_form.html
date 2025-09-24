@@ -1,100 +1,97 @@
-<!-- Espécies Químicas -->
-                    <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="border-bottom pb-2 mb-0">
-                                <i{% extends 'chemical_simulator/base.html' %}
+{% extends 'chemical_simulator/base.html' %}
 
 {% block title %}{{ title }} - Simulador Químico{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>{{ title }}</h2>
-            <a href="{% if template %}{% url 'reaction_template_detail' template.pk %}{% else %}{% url 'reaction_template_list' %}{% endif %}" 
-               class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-1"></i>Voltar
-            </a>
-        </div>
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>{{ title }}</h2>
+                <a href="{% if template %}{% url 'reaction_template_detail' template.pk %}{% else %}{% url 'reaction_template_list' %}{% endif %}" 
+                    class="btn btn-outline-secondary">
+                     <i class="fas fa-arrow-left me-1"></i>Voltar
+                </a>
+            </div>
 
-        <div class="card">
-            <div class="card-body">
-                <form method="post" novalidate>
-                    {% csrf_token %}
-                    
-                    {% if form.non_field_errors %}
-                    <div class="alert alert-danger">
-                        {{ form.non_field_errors }}
-                    </div>
-                    {% endif %}
-
-                    <!-- Informações Básicas -->
-                    <div class="mb-4">
-                        <h5 class="border-bottom pb-2 mb-3">
-                            <i class="fas fa-info-circle me-2"></i>Informações Básicas
-                        </h5>
+            <div class="card">
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
                         
-                        <div class="row">
-                            <div class="col-md-8 mb-3">
-                                <label class="form-label">{{ form.name.label }}</label>
-                                {{ form.name }}
-                                {% if form.name.errors %}
-                                <div class="text-danger small">{{ form.name.errors }}</div>
-                                {% endif %}
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <div class="form-check mt-4">
-                                    {{ form.is_active }}
-                                    <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
-                                        {{ form.is_active.label }}
-                                    </label>
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                        {% endif %}
+
+                        <!-- Informações Básicas -->
+                        <div class="mb-4">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="fas fa-info-circle me-2"></i>Informações Básicas
+                            </h5>
+                            
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <label class="form-label">{{ form.name.label }}</label>
+                                    {{ form.name }}
+                                    {% if form.name.errors %}
+                                    <div class="text-danger small">{{ form.name.errors }}</div>
+                                    {% endif %}
                                 </div>
-                                {% if form.is_active.errors %}
-                                <div class="text-danger small">{{ form.is_active.errors }}</div>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">{{ form.description.label }}</label>
-                            {{ form.description }}
-                            {% if form.description.errors %}
-                            <div class="text-danger small">{{ form.description.errors }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <!-- Parâmetros Cinéticos -->
-                    <div class="mb-4">
-                        <h5 class="border-bottom pb-2 mb-3">
-                            <i class="fas fa-calculator me-2"></i>Parâmetros Cinéticos
-                        </h5>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">{{ form.reaction_order.label }}</label>
-                                {{ form.reaction_order }}
-                                {% if form.reaction_order.errors %}
-                                <div class="text-danger small">{{ form.reaction_order.errors }}</div>
-                                {% endif %}
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">{{ form.rate_constant.label }}</label>
-                                <div class="input-group">
-                                    {{ form.rate_constant }}
-                                    <span class="input-group-text">s⁻¹</span>
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check mt-4">
+                                        {{ form.is_active }}
+                                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                            {{ form.is_active.label }}
+                                        </label>
+                                    </div>
+                                    {% if form.is_active.errors %}
+                                    <div class="text-danger small">{{ form.is_active.errors }}</div>
+                                    {% endif %}
                                 </div>
-                                {% if form.rate_constant.errors %}
-                                <div class="text-danger small">{{ form.rate_constant.errors }}</div>
-                                {% endif %}
-                                {% if form.rate_constant.help_text %}
-                                <div class="form-text">{{ form.rate_constant.help_text }}</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.description.label }}</label>
+                                {{ form.description }}
+                                {% if form.description.errors %}
+                                <div class="text-danger small">{{ form.description.errors }}</div>
                                 {% endif %}
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Espécies Químicas -->
+                        <!-- Parâmetros Cinéticos -->
+                        <div class="mb-4">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="fas fa-calculator me-2"></i>Parâmetros Cinéticos
+                            </h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ form.reaction_order.label }}</label>
+                                    {{ form.reaction_order }}
+                                    {% if form.reaction_order.errors %}
+                                    <div class="text-danger small">{{ form.reaction_order.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ form.rate_constant.label }}</label>
+                                    <div class="input-group">
+                                        {{ form.rate_constant }}
+                                        <span class="input-group-text">s⁻¹</span>
+                                    </div>
+                                    {% if form.rate_constant.errors %}
+                                    <div class="text-danger small">{{ form.rate_constant.errors }}</div>
+                                    {% endif %}
+                                    {% if form.rate_constant.help_text %}
+                                    <div class="form-text">{{ form.rate_constant.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Espécies Químicas -->
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="border-bottom pb-2 mb-0">
@@ -105,79 +102,122 @@
                                 <i class="fas fa-cogs me-1"></i>Interface Visual
                             </a>
                             {% endif %}
-                        </div> class="fas fa-flask me-2"></i>Espécies Químicas
-                        </h5>
+                        </div>
+                        
+                        <!-- Filtro Global -->
+                        <div class="mb-3">
+                            <input type="text" id="global-species-filter" class="form-control" 
+                                   placeholder="Filtrar todas as espécies...">
+                        </div>
                         
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-danger">
-                                    <i class="fas fa-arrow-right me-1"></i>{{ form.reactants.label }}
-                                </label>
-                                {{ form.reactants }}
-                                {% if form.reactants.errors %}
-                                <div class="text-danger small">{{ form.reactants.errors }}</div>
-                                {% endif %}
-                                {% if form.reactants.help_text %}
-                                <div class="form-text">{{ form.reactants.help_text }}</div>
-                                {% endif %}
+                            <!-- Reagentes -->
+                            <div class="col-md-4 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-header bg-danger text-white">
+                                        <h6 class="card-title mb-0">
+                                            <i class="fas fa-arrow-right me-1"></i>Reagentes
+                                        </h6>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="species-selection-box" 
+                                             style="height: 300px; overflow-y: auto;" 
+                                             data-category="reactant">
+                                            <!-- Preenchido dinamicamente -->
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label text-success">
-                                    <i class="fas fa-arrow-left me-1"></i>{{ form.products.label }}
-                                </label>
-                                {{ form.products }}
-                                {% if form.products.errors %}
-                                <div class="text-danger small">{{ form.products.errors }}</div>
-                                {% endif %}
-                                {% if form.products.help_text %}
-                                <div class="form-text">{{ form.products.help_text }}</div>
-                                {% endif %}
+                            
+                            <!-- Intermediários/Auxiliares -->
+                            <div class="col-md-4 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-header bg-warning text-white">
+                                        <h6 class="card-title mb-0">
+                                            <i class="fas fa-exchange-alt me-1"></i>Intermediários/Auxiliares
+                                        </h6>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="species-selection-box" 
+                                             style="height: 300px; overflow-y: auto;" 
+                                             data-category="auxiliary">
+                                            <!-- Preenchido dinamicamente -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Produtos -->
+                            <div class="col-md-4 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-header bg-success text-white">
+                                        <h6 class="card-title mb-0">
+                                            <i class="fas fa-arrow-left me-1"></i>Produtos
+                                        </h6>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="species-selection-box" 
+                                             style="height: 300px; overflow-y: auto;" 
+                                             data-category="product">
+                                            <!-- Preenchido dinamicamente -->
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
-                        <!-- Dica sobre seleção múltipla -->
+                        <!-- Campos hidden originais (mantidos para funcionamento) -->
+                        <div style="display: none;">
+                            {{ form.reactants }}
+                            {{ form.intermediates }}
+                            {{ form.products }}
+                        </div>
+                        
+                        <!-- Informações -->
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle me-2"></i>
-                            <strong>Dica:</strong> Use Ctrl+Click (Windows/Linux) ou Cmd+Click (Mac) para selecionar múltiplas espécies.
+                            <strong>Instruções:</strong> 
+                            Marque as espécies desejadas em cada categoria. Use o filtro para encontrar espécies rapidamente.
                         </div>
                     </div>
 
-                    <!-- Botões de ação -->
-                    <div class="d-flex justify-content-between">
-                        <a href="{% if template %}{% url 'reaction_template_detail' template.pk %}{% else %}{% url 'reaction_template_list' %}{% endif %}" 
-                           class="btn btn-secondary">
-                            <i class="fas fa-times me-1"></i>Cancelar
-                        </a>
-                        
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save me-1"></i>
-                            {% if template %}Atualizar Template{% else %}Criar Template{% endif %}
-                        </button>
-                    </div>
-                </form>
+                        <!-- Botões de ação -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{% if template %}{% url 'reaction_template_detail' template.pk %}{% else %}{% url 'reaction_template_list' %}{% endif %}" 
+                            class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i>Cancelar
+                            </a>
+                            
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>
+                                {% if template %}Atualizar Template{% else %}Criar Template{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </div>
 
-        <!-- Preview/Informações adicionais -->
-        <div class="card mt-4">
-            <div class="card-header">
-                <h6 class="card-title mb-0">
-                    <i class="fas fa-lightbulb me-2"></i>Ajuda
-                </h6>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4">
-                        <strong>1ª Ordem:</strong>
-                        <p class="small text-muted">Taxa ∝ [A]</p>
-                    </div>
-                    <div class="col-md-4">
-                        <strong>2ª Ordem:</strong>
-                        <p class="small text-muted">Taxa ∝ [A]²</p>
-                    </div>
-                    <div class="col-md-4">
-                        <strong>3ª Ordem:</strong>
-                        <p class="small text-muted">Taxa ∝ [A]³</p>
+            <!-- Preview/Informações adicionais -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-lightbulb me-2"></i>Ajuda
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>1ª Ordem:</strong>
+                            <p class="small text-muted">Taxa ∝ [A]</p>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>2ª Ordem:</strong>
+                            <p class="small text-muted">Taxa ∝ [A]²</p>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>3ª Ordem:</strong>
+                            <p class="small text-muted">Taxa ∝ [A]³</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -189,6 +229,15 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Organizar espécies por categoria
+    organizeSpeciesByCategory();
+    
+    // Setup filtro global
+    setupGlobalFilter();
+    
+    // Setup listeners para sincronização com campos originais
+    setupFieldSynchronization();
+    
     // Auto-resize textarea
     const textarea = document.querySelector('textarea');
     if (textarea) {
@@ -198,5 +247,237 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+function organizeSpeciesByCategory() {
+    console.log("🔍 Iniciando organizeSpeciesByCategory...");
+
+    const reactantsField = document.getElementById('id_reactants');
+    if (!reactantsField) {
+        console.error("❌ Campo #id_reactants não encontrado!");
+        return;
+    }
+    
+    console.log(`✅ Encontrado campo reactants com ${reactantsField.options.length} opções`);
+
+    const categories = {
+        reactant: [],
+        auxiliary: [],
+        product: []
+    };
+
+    // Mapeamento de simulation_role para categoria
+    const roleToCategory = {
+        'reactant': 'reactant',
+        'product': 'product',
+        'intermediate': 'auxiliary',
+        'catalyst': 'auxiliary',
+        'solvent': 'auxiliary'
+    };
+    
+    // Processar todas as opções
+    Array.from(reactantsField.options).forEach(option => {
+        if (!option.value) return;
+        
+        const text = option.textContent.trim();
+        const simulationRole = option.dataset.role || 'reactant';
+        
+        console.log(`📄 Opção: "${text}" | data-role: "${simulationRole}"`);
+        
+        // ✅ Obter categoria correta
+        const category = roleToCategory[simulationRole] || 'reactant'; // padrão: reactant
+        
+        categories[category].push({
+            value: option.value,
+            label: text,
+            role: simulationRole
+        });
+    });
+    
+    console.log("📊 Categorias:", categories);
+
+    // Ordenar
+    Object.keys(categories).forEach(category => {
+        categories[category].sort((a, b) => 
+            a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'accent', numeric: true })
+        );
+    });
+    
+    // Criar checkboxes
+    createCategoryCheckboxes('reactant', categories.reactant);
+    createCategoryCheckboxes('auxiliary', categories.auxiliary);
+    createCategoryCheckboxes('product', categories.product);
+
+    console.log("✅ organizeSpeciesByCategory concluído");
+}
+
+// Função para extrair espécies do formulário
+function getAllSpeciesFromForm() {
+    const reactantsField = document.getElementById('id_reactants');
+    if (!reactantsField) return [];
+    
+    const options = Array.from(reactantsField.options);
+    const speciesList = [];
+    
+    options.forEach(option => {
+        if (!option.value) return;
+        
+        // Extrair o papel do texto do option
+        const roleText = text.split(' - ')[1]; // pega "Solvente", "Reagente", etc.
+        let simulationRole = 'reactant'; // padrão
+
+        if (roleText === 'Intermediário') {
+            simulationRole = 'intermediate';
+        } else if (roleText === 'Catalisador' || roleText === 'Solvente') {
+            simulationRole = 'auxiliary';
+        } else if (roleText === 'Produto') {
+            simulationRole = 'product';
+        } else if (roleText === 'Reagente') {
+            simulationRole = 'reactant';
+        }
+        
+        speciesList.push({
+            value: option.value,
+            label: text.split(' - ')[0],
+            role: simulationRole
+        });
+    });
+    
+    return speciesList;
+}
+
+function parseSpeciesLabel(label) {
+    // Extrair nome da espécie do label
+    return {
+        name: label.trim()
+    };
+}
+
+function isReactantType(name) {
+    const reactantKeywords = ['ácido', 'base', 'hidróxido', 'cloreto', 'sulfato', 'nitrato'];
+    const nameLower = name.toLowerCase();
+    return reactantKeywords.some(keyword => nameLower.includes(keyword)) || 
+           nameLower.includes('reagente');
+}
+
+function isAuxiliaryType(name) {
+    const auxiliaryKeywords = ['água', 'solvente', 'catalisador'];
+    const nameLower = name.toLowerCase();
+    return auxiliaryKeywords.some(keyword => nameLower.includes(keyword));
+}
+
+function createCategoryCheckboxes(category, speciesList) {
+    const container = document.querySelector(`[data-category="${category}"]`);
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    speciesList.forEach(species => {
+        const checkboxDiv = document.createElement('div');
+        checkboxDiv.className = 'form-check mb-1 species-option';
+        checkboxDiv.dataset.name = species.label.toLowerCase();
+        checkboxDiv.dataset.category = category;
+        checkboxDiv.dataset.role = species.role; // ← adicionado!
+        
+        const checkbox = document.createElement('input');
+        checkbox.className = 'form-check-input';
+        checkbox.type = 'checkbox';
+        checkbox.value = species.value;
+        checkbox.id = `${category}_${species.value}`;
+        checkbox.dataset.category = category;
+        checkbox.dataset.speciesId = species.value;
+        checkbox.dataset.role = species.role; // ← adicionado!
+        
+        const label = document.createElement('label');
+        label.className = 'form-check-label small';
+        label.htmlFor = checkbox.id;
+        label.textContent = species.label;
+        
+        checkboxDiv.appendChild(checkbox);
+        checkboxDiv.appendChild(label);
+        container.appendChild(checkboxDiv);
+        
+        checkbox.addEventListener('change', syncWithOriginalFields);
+    });
+}
+
+function setupGlobalFilter() {
+    const globalFilter = document.getElementById('global-species-filter');
+    if (!globalFilter) return;
+    
+    globalFilter.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const allSpeciesOptions = document.querySelectorAll('.species-option');
+        
+        allSpeciesOptions.forEach(option => {
+            const speciesName = option.dataset.name || '';
+            const isVisible = speciesName.includes(searchTerm);
+            option.style.display = isVisible ? 'block' : 'none';
+        });
+    });
+}
+
+function syncWithOriginalFields() {
+    // Sincronizar reagentes
+    const reactantCheckboxes = document.querySelectorAll('[data-category="reactant"] input:checked');
+    const reactantsField = document.getElementById('id_reactants');
+    
+    if (reactantsField) {
+        Array.from(reactantsField.options).forEach(option => {
+            option.selected = Array.from(reactantCheckboxes).some(cb => cb.value === option.value);
+        });
+    }
+    
+    // Sincronizar INTERMEDIÁRIOS (só os marcados como auxiliary E role=intermediate)
+    const auxiliaryCheckboxes = document.querySelectorAll('[data-category="auxiliary"] input:checked');
+    const intermediatesField = document.getElementById('id_intermediates');
+    
+    if (intermediatesField) {
+        Array.from(intermediatesField.options).forEach(option => {
+            option.selected = Array.from(auxiliaryCheckboxes)
+                .filter(cb => cb.dataset.role === 'intermediate') // só intermediários
+                .some(cb => cb.value === option.value);
+        });
+    }
+    
+    // Sincronizar produtos
+    const productCheckboxes = document.querySelectorAll('[data-category="product"] input:checked');
+    const productsField = document.getElementById('id_products');
+    
+    if (productsField) {
+        Array.from(productsField.options).forEach(option => {
+            option.selected = Array.from(productCheckboxes).some(cb => cb.value === option.value);
+        });
+    }
+}
+
+function setupFieldSynchronization() {
+    const reactantsField = document.getElementById('id_reactants');
+    const intermediatesField = document.getElementById('id_intermediates');
+    const productsField = document.getElementById('id_products');
+    
+    // Carregar reagentes
+    if (reactantsField) {
+        Array.from(reactantsField.selectedOptions).forEach(option => {
+            const checkbox = document.querySelector(`[data-species-id="${option.value}"][data-category="reactant"]`);
+            if (checkbox) checkbox.checked = true;
+        });
+    }
+    
+    // Carregar INTERMEDIÁRIOS
+    if (intermediatesField) {
+        Array.from(intermediatesField.selectedOptions).forEach(option => {
+            const checkbox = document.querySelector(`[data-species-id="${option.value}"][data-category="auxiliary"]`);
+            if (checkbox) checkbox.checked = true;
+        });
+    }
+    
+    // Carregar produtos
+    if (productsField) {
+        Array.from(productsField.selectedOptions).forEach(option => {
+            const checkbox = document.querySelector(`[data-species-id="${option.value}"][data-category="product"]`);
+            if (checkbox) checkbox.checked = true;
+        });
+    }
+}
 </script>
 {% endblock %}

@@ -1,0 +1,242 @@
+{% extends 'chemical_simulator/base.html' %}
+{% load concentration_filters %}
+
+
+{% block title %}{{ title }} - Simulador Químico{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>{{ title }}</h2>
+            <a href="{% url 'simulation_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Voltar
+            </a>
+        </div>
+
+        <form method="post" id="simulation-form">
+            {% csrf_token %}
+            
+            <div class="row">
+                <!-- Parâmetros da Simulação -->
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Parâmetros da Simulação</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.name.label }}</label>
+                                {{ form.name }}
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.template.label }}</label>
+                                {{ form.template }}
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ form.time_span.label }}</label>
+                                    <div class="input-group">
+                                        {{ form.time_span }}
+                                        <span class="input-group-text">s</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ form.time_points.label }}</label>
+                                    {{ form.time_points }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Concentrações Iniciais -->
+                <div class="mb-3">
+                    <h5>Concentrações Iniciais</h5>
+                    {% for field in form %}
+                        {% if field.name|starts_with:"initial_concentration_" %}
+                            <div class="row mb-2">
+                                <div class="col-md-8">
+                                    {{ field.label_tag }}
+                                </div>
+                                <div class="col-md-4">
+                                    {{ field }}
+                                    <span class="text-muted small">mol·L⁻¹</span>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Informações da Reação -->
+            <div class="mb-3">
+                <h5>Informações da Reação</h5>
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Ordem:</strong>
+                        <p class="mb-0">{{ reaction_order }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Constante k:</strong>
+                        <p class="mb-0">{{ rate_constant }}</p>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Lei Cinética:</strong>
+                        <p class="mb-0">{{ kinetic_law }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Template Info -->
+            <div id="template-info" class="card mb-4" style="display: none;">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Informações da Reação</h5>
+                </div>
+                <div class="card-body">
+                    <div id="reaction-equation" class="text-center mb-3">
+                        <!-- Equação preenchida dinamicamente -->
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-md-4">
+                            <strong>Ordem:</strong><br>
+                            <span id="reaction-order" class="badge bg-info"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Constante k:</strong><br>
+                            <code id="rate-constant"></code>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Lei Cinética:</strong><br>
+                            <span id="kinetic-law"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{ form.initial_concentrations }}
+
+            <!-- Botões -->
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'simulation_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-times me-1"></i>Cancelar
+                </a>
+                
+                <button type="submit" class="btn btn-success" id="run-simulation-btn">
+                    <i class="fas fa-play me-1"></i>Executar Simulação
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const templateSelect = document.getElementById('id_template');
+    const concentrationsContainer = document.getElementById('concentrations-container');
+    const templateInfo = document.getElementById('template-info');
+    const concentrationsInput = document.getElementById('id_initial_concentrations');
+    
+    // Leis cinéticas por ordem
+    const kineticLaws = {
+        1: '-d[A]/dt = k[A]',
+        2: '-d[A]/dt = k[A]²', 
+        3: '-d[A]/dt = k[A]³'
+    };
+    
+    templateSelect.addEventListener('change', function() {
+        const templateId = this.value;
+        if (templateId) {
+            loadTemplateData(templateId);
+        } else {
+            hideTemplateInfo();
+        }
+    });
+    
+    // Carregar dados do template se pré-selecionado
+    if (templateSelect.value) {
+        loadTemplateData(templateSelect.value);
+    }
+    
+    async function loadTemplateData(templateId) {
+        try {
+            const response = await fetch(`/templates/${templateId}/`);
+            if (!response.ok) throw new Error('Erro ao carregar template');
+            
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            // Extrair dados do template (você pode criar uma API dedicada)
+            showTemplateInfo(templateId);
+            
+        } catch (error) {
+            console.error('Erro:', error);
+        }
+    }
+    
+    function showTemplateInfo(templateId) {
+        // Simulado - em produção usaria AJAX para obter dados reais
+        templateInfo.style.display = 'block';
+        
+        // Criar campos de concentração para espécies do template
+        createConcentrationFields([
+            {id: 1, name: 'Água', formula: 'H2O', default_concentration: 55.56, role: 'solvent'},
+            {id: 2, name: 'HCl', formula: 'HCl', default_concentration: 0.1, role: 'reactant'}
+        ]);
+    }
+    
+    function createConcentrationFields(species) {
+        concentrationsContainer.innerHTML = '';
+        
+        species.forEach(sp => {
+            const fieldDiv = document.createElement('div');
+            fieldDiv.className = 'mb-3';
+            fieldDiv.innerHTML = `
+                <label class="form-label">
+                    ${sp.name} (${sp.formula}) - ${sp.role}
+                </label>
+                <div class="input-group">
+                    <input type="number" 
+                           class="form-control concentration-input" 
+                           data-species-id="${sp.id}"
+                           value="${sp.default_concentration}"
+                           step="0.0001" 
+                           min="0">
+                    <span class="input-group-text">mol·L⁻¹</span>
+                </div>
+            `;
+            concentrationsContainer.appendChild(fieldDiv);
+        });
+        
+        updateConcentrationsJSON();
+        
+        // Listener para atualizações
+        document.querySelectorAll('.concentration-input').forEach(input => {
+            input.addEventListener('input', updateConcentrationsJSON);
+        });
+    }
+    
+    function updateConcentrationsJSON() {
+        const concentrations = {};
+        document.querySelectorAll('.concentration-input').forEach(input => {
+            const speciesId = input.dataset.speciesId;
+            const value = parseFloat(input.value) || 0;
+            concentrations[speciesId] = value;
+        });
+        
+        concentrationsInput.value = JSON.stringify(concentrations);
+    }
+    
+    function hideTemplateInfo() {
+        templateInfo.style.display = 'none';
+        concentrationsContainer.innerHTML = '';
+        concentrationsInput.value = '';
+    }
+});
+</script>
+{% endblock %}
